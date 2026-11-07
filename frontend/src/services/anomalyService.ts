@@ -66,7 +66,16 @@ export async function getAnomalies(filters?: AnomalyFilters): Promise<Anomaly[]>
 export async function getAnomaly(id: string): Promise<Anomaly> {
   await simulateDelay()
 
-  const anomaly = anomalies.find((a) => a.id === id)
+  const normalized = id.toLowerCase().replace(/[-_]/g, '')
+  const anomaly = anomalies.find(
+    (a) =>
+      a.id === id ||
+      a.id.toLowerCase().replace(/[-_]/g, '') === normalized ||
+      a.id.replace('anom_', 'anom-00') === id ||
+      a.id.replace('anom_', 'anom-0') === id ||
+      id.replace('anom-00', 'anom_') === a.id ||
+      id.replace('anom-0', 'anom_') === a.id,
+  )
   if (!anomaly) {
     throw new Error(`Anomaly not found: ${id}`)
   }

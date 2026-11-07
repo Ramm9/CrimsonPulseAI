@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import type { Endpoint } from '@/types'
 import { cn } from '@/utils/cn'
@@ -22,6 +23,7 @@ const healthOrder: Record<string, number> = {
 }
 
 export function EndpointHealthTable({ endpoints, className }: EndpointHealthTableProps) {
+  const navigate = useNavigate()
   const [sortKey, setSortKey] = useState<SortKey>('requestCount')
   const [sortDir, setSortDir] = useState<SortDirection>('desc')
 
@@ -124,7 +126,7 @@ export function EndpointHealthTable({ endpoints, className }: EndpointHealthTabl
             <tr
               key={endpoint.id}
               onClick={() => {
-                window.location.href = `/api-explorer/${endpoint.id}`
+                navigate(`/api-explorer/${endpoint.id}`)
               }}
               className="cursor-pointer border-b border-cp-border/50 transition-colors hover:bg-cp-elevated/50"
             >

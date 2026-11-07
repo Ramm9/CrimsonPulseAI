@@ -62,20 +62,20 @@ function BrandedPanel() {
           <span className="text-cp-crimson">minutes</span>
         </h2>
         <p className="mt-4 text-cp-text-secondary leading-relaxed">
-          Join thousands of engineering teams using CrimsonPulse AI to keep
+          Designed for modern engineering teams using CrimsonPulse AI to keep
           their APIs fast, reliable, and observable.
         </p>
 
-        {/* Stats */}
+        {/* Technical Highlights */}
         <div className="mt-10 grid grid-cols-3 gap-4">
           {[
-            { value: '99.9%', label: 'Uptime' },
-            { value: '< 50ms', label: 'SDK overhead' },
-            { value: '10K+', label: 'APIs monitored' },
+            { value: 'Async', label: 'Telemetry dispatch' },
+            { value: 'Zero-Secret', label: 'Client scrubbing' },
+            { value: 'OpenAPI', label: 'Contract drift' },
           ].map((s) => (
             <div key={s.label}>
-              <p className="text-lg font-bold text-cp-text">{s.value}</p>
-              <p className="text-xs text-cp-text-secondary">{s.label}</p>
+              <p className="text-sm font-bold font-mono text-cp-text">{s.value}</p>
+              <p className="text-[11px] text-cp-text-secondary">{s.label}</p>
             </div>
           ))}
         </div>

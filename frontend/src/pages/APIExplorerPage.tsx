@@ -255,7 +255,19 @@ export function APIExplorerPage() {
               ) : filteredEndpoints.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-sm font-sans text-cp-text-secondary">
-                    No API endpoints matched your search criteria.
+                    <p>No API endpoints matched your search criteria.</p>
+                    {(search || methodFilter !== 'all' || healthFilter !== 'all') && (
+                      <button
+                        onClick={() => {
+                          setSearch('')
+                          setMethodFilter('all')
+                          setHealthFilter('all')
+                        }}
+                        className="mt-3 rounded-lg border border-cp-border bg-cp-secondary px-3 py-1.5 text-xs text-cp-text hover:bg-cp-elevated transition-colors"
+                      >
+                        Reset Search Filters
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (

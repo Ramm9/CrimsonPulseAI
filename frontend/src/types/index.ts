@@ -198,6 +198,8 @@ export interface EvidenceCard {
   title: string
   type: 'metric' | 'log' | 'deployment' | 'pattern' | 'correlation'
   content: string
+  source?: string
+  verified?: boolean
   data?: Record<string, string | number>
   severity?: 'info' | 'warning' | 'critical'
 }

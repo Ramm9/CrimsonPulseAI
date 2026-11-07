@@ -1,5 +1,6 @@
 import { Sparkles, ArrowRight } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { cn } from '@/utils/cn'
 
 interface AISignalCardProps {
@@ -60,9 +61,10 @@ export function AISignalCard({ className }: AISignalCardProps) {
             <div className="h-1.5 w-1.5 rounded-full bg-cp-warning" />
             <div className="text-xs text-cp-text-secondary">
               <span className="text-cp-text-secondary">P95 changed from </span>
-              <span className="font-mono font-medium text-cp-text">184ms</span>
+              <span className="font-mono font-medium text-cp-text">180ms</span>
               <span className="mx-1 text-cp-text-secondary">→</span>
-              <span className="font-mono font-medium text-cp-crimson">620ms</span>
+              <span className="font-mono font-medium text-cp-crimson">2,100ms</span>
+              <span className="ml-1 text-[11px] text-cp-crimson font-mono">(+1,066%)</span>
             </div>
           </motion.div>
 
@@ -75,16 +77,17 @@ export function AISignalCard({ className }: AISignalCardProps) {
             <div className="h-1.5 w-1.5 rounded-full bg-cp-critical" />
             <div className="text-xs text-cp-text-secondary">
               <span className="text-cp-text-secondary">Error rate changed from </span>
-              <span className="font-mono font-medium text-cp-text">0.2%</span>
+              <span className="font-mono font-medium text-cp-text">0.40%</span>
               <span className="mx-1 text-cp-text-secondary">→</span>
-              <span className="font-mono font-medium text-cp-critical">3.8%</span>
+              <span className="font-mono font-medium text-cp-critical">1.82%</span>
+              <span className="ml-1 text-[11px] text-cp-text-secondary font-mono">(peak 3.8%)</span>
             </div>
           </motion.div>
         </div>
 
         {/* Action button */}
-        <a
-          href="/incidents/inc-001"
+        <Link
+          to="/incidents/inc_01"
           className="group/btn flex w-full items-center justify-center gap-2 rounded-lg border border-cp-crimson/30 bg-cp-crimson/10 px-4 py-2.5 text-sm font-medium text-cp-crimson transition-all hover:bg-cp-crimson/20 hover:border-cp-crimson/50"
         >
           Inspect Incident
@@ -92,7 +95,7 @@ export function AISignalCard({ className }: AISignalCardProps) {
             size={14}
             className="transition-transform group-hover/btn:translate-x-0.5"
           />
-        </a>
+        </Link>
       </div>
     </div>
   )

@@ -609,7 +609,7 @@ export const incidents: Incident[] = [
       createdAt: subDays(now, 150).toISOString(),
     },
     relatedAnomalyIds: ['anom_01', 'anom_06'],
-    aiSummary: 'Root cause identified as database connection pool exhaustion. Deploy v2.4.1 introduced an unindexed JOIN on the orders_analytics materialized view, causing connections to be held for 8-12 seconds instead of the normal 50-80ms. Recommended fix: add composite index on (order_id, created_at) and increase pool max from 20 to 50.',
+    aiSummary: 'Primary hypothesis: database connection pool exhaustion (Confidence: 88%). Correlated with deploy v2.4.1 which introduced an unindexed JOIN on the orders_analytics materialized view, causing connections to be held for 8–12 seconds instead of normal 50–80ms. Recommended verification: inspect pg_stat_activity and run EXPLAIN ANALYZE before applying composite index hotfix.',
     comments: [
       {
         id: 'cmt_01',
@@ -1099,6 +1099,8 @@ export const aiInvestigations: AIInvestigation[] = [
         id: 'ev_01',
         title: 'Latency Spike Timeline',
         type: 'metric',
+        source: 'Telemetry timeseries (POST /api/orders/ P95)',
+        verified: true,
         content: 'P95 latency for POST /api/orders/ increased from 180ms to 2100ms starting at the exact time of deploy v2.4.1 rollout.',
         data: {
           baseline_p95: 180,
@@ -1110,8 +1112,10 @@ export const aiInvestigations: AIInvestigation[] = [
       },
       {
         id: 'ev_02',
-        title: 'Database Connection Pool',
+        title: 'Database Connection Pool Saturation',
         type: 'metric',
+        source: 'pg_stat_activity active connections',
+        verified: true,
         content: 'PostgreSQL connection pool is fully saturated at 20/20 active connections. Average connection hold time: 9.4 seconds (baseline: 62ms).',
         data: {
           pool_max: 20,
@@ -1123,9 +1127,11 @@ export const aiInvestigations: AIInvestigation[] = [
       },
       {
         id: 'ev_03',
-        title: 'Deployment Correlation',
+        title: 'Deployment Event Correlation',
         type: 'deployment',
-        content: 'Deploy v2.4.1 by Marcus Chen occurred at T-4h. Latency spike began within 8 minutes of deployment completion. Changelog includes: "Added orders analytics materialized view refresh."',
+        source: 'GitHub deployment webhook (commit a3f8c2d by Marcus Chen)',
+        verified: true,
+        content: 'Deploy v2.4.1 occurred at T-4h. Latency spike began within 8 minutes of deployment completion. Changelog includes: "Added orders analytics materialized view refresh."',
         data: {
           version: '2.4.1',
           commit: 'a3f8c2d',
@@ -1135,8 +1141,10 @@ export const aiInvestigations: AIInvestigation[] = [
       },
       {
         id: 'ev_04',
-        title: 'Slow Query Log',
+        title: 'Slow Query Execution Log',
         type: 'log',
+        source: 'pg_stat_statements query performance catalog',
+        verified: true,
         content: 'pg_stat_statements shows the materialized view refresh query averaging 9.4s execution time with 847 calls in the last 3 hours. Sequential scan on inventory table (2.4M rows) is the bottleneck.',
         data: {
           avg_exec_time: 9400,
@@ -1147,9 +1155,11 @@ export const aiInvestigations: AIInvestigation[] = [
       },
       {
         id: 'ev_05',
-        title: 'Cascading Impact Pattern',
+        title: 'Cascading Dependency Impact',
         type: 'correlation',
-        content: 'Connection pool saturation is causing latency increases across 3 of 6 endpoints in the Nexus Commerce API. Endpoints using Redis cache are unaffected.',
+        source: 'Cross-service dependency inference model',
+        verified: false,
+        content: 'Connection pool saturation is causing secondary latency increases across 3 of 6 endpoints in the Nexus Commerce API. Endpoints using Redis cache are unaffected.',
         data: {
           affected_endpoints: 3,
           total_endpoints: 6,
@@ -1179,34 +1189,336 @@ export const aiInvestigations: AIInvestigation[] = [
   },
   {
     id: 'inv_02',
+    incidentId: 'inc_02',
+    messages: [
+      {
+        id: 'msg_02_01',
+        role: 'assistant',
+        content: `I have analyzed the **Contract Mismatch – Products** incident on \`GET /api/products/\`.
+
+### 1. Observed Evidence (Verified Facts)
+- **Schema Drift**: The response payload contains undeclared fields \`sku\` and \`warehouse_id\` not defined in OpenAPI spec \`v2.1.0\`.
+- **Type Incompatibility**: Field \`stock_count\` is returned as String (\`"42"\`) instead of Integer (\`42\`).
+- **Deployment Correlation**: Introduced in commit \`d8f1a2c\` ("Add warehouse inventory integration") merged 2 days ago by Sofia Petrov.
+- **Impact**: 312 response contract violations recorded. Client deserialization warnings detected across mobile catalog consumers.
+
+### 2. Hypothesized Contributing Factors (Unconfirmed)
+- **Hypothesis 1 (Confidence: 94%)**: Serializer in \`products/serializers.py\` was extended with warehouse fields without updating \`openapi.yaml\`.
+- **Hypothesis 2 (Confidence: 78%)**: Type coercion bug in Django REST serializer formatting \`stock_count\` via string representation.
+
+### 3. Recommended Actions
+1. Update \`openapi.yaml\` to declare \`sku\` and \`warehouse_id\` in \`ProductItem\` schema.
+2. Fix \`products/serializers.py\` so \`stock_count\` serializes as \`IntegerField\`.
+3. Add contract validation linting stage in CI pipeline.`,
+        timestamp: subDays(now, 2).toISOString(),
+        evidenceRefs: ['ev_02_01', 'ev_02_02', 'ev_02_03'],
+      },
+      {
+        id: 'msg_02_02',
+        role: 'user',
+        content: 'Can you show the exact schema diff between the spec and response?',
+        timestamp: subDays(now, 1.8).toISOString(),
+      },
+      {
+        id: 'msg_02_03',
+        role: 'assistant',
+        content: `### Contract Schema Diff: GET /api/products/
+
+| Field | OpenAPI Spec v2.1.0 | Actual API Response | Status |
+|---|---|---|---|
+| \`id\` | \`string (uuid)\` | \`string (uuid)\` | 🟢 Match |
+| \`name\` | \`string\` | \`string\` | 🟢 Match |
+| \`price\` | \`number (float)\` | \`number (float)\` | 🟢 Match |
+| \`stock_count\` | \`integer\` | \`string ("42")\` | 🔴 Type Mismatch |
+| \`sku\` | *Not defined* | \`string ("SKU-8821")\` | 🟡 Undeclared Field |
+| \`warehouse_id\` | *Not defined* | \`string ("wh_us_east_1")\` | 🟡 Undeclared Field |
+
+\`\`\`python
+# products/serializers.py
+class ProductSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    name = serializers.CharField(max_length=255)
+    price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    stock_count = serializers.IntegerField()  # Fix: was formatted string
+    sku = serializers.CharField(max_length=64)  # Declare in openapi.yaml
+    warehouse_id = serializers.CharField(max_length=32)  # Declare in openapi.yaml
+\`\`\`
+
+**Source**: CrimsonPulse Contract Validator vs \`openapi.yaml\` (v2.1.0).
+**Remediation**: Cast \`stock_count\` to \`IntegerField\` and sync \`openapi.yaml\` definitions.`,
+        timestamp: subDays(now, 1.7).toISOString(),
+        evidenceRefs: ['ev_02_02'],
+      },
+      {
+        id: 'msg_02_04',
+        role: 'user',
+        content: 'Is this breaking external consumers?',
+        timestamp: subDays(now, 1.5).toISOString(),
+      },
+      {
+        id: 'msg_02_05',
+        role: 'assistant',
+        content: `Telemetry indicates **partial client degradation**:
+
+- Web storefront: 🟢 Normal (tolerant JSON parser coerces string to number).
+- Android Mobile app (v3.12.0): 🔴 Warning (strict type deserializer logs \`FormatException\` on \`stock_count\`).
+- Third-party webhook aggregators: 🟡 Warning (ignoring unexpected fields \`sku\` and \`warehouse_id\`).
+
+Applying the serializer type fix to output native integers will immediately resolve the mobile deserialization exceptions without requiring a mobile app store update.`,
+        timestamp: subDays(now, 1.4).toISOString(),
+        evidenceRefs: ['ev_02_04'],
+      },
+    ],
+    evidenceCards: [
+      {
+        id: 'ev_02_01',
+        title: 'Schema Drift - Undeclared Fields',
+        type: 'pattern',
+        source: 'OpenAPI spec v2.1.0 contract validator',
+        verified: true,
+        content: 'GET /api/products/ response payload includes fields "sku" and "warehouse_id", neither of which are defined in the OpenAPI schema for ProductItem.',
+        data: {
+          schema_version: 'v2.1.0',
+          undeclared_fields: 'sku, warehouse_id',
+          violations: 312,
+        },
+        severity: 'warning',
+      },
+      {
+        id: 'ev_02_02',
+        title: 'Type Incompatibility: stock_count',
+        type: 'metric',
+        source: 'JSON Schema validator (Draft 7)',
+        verified: true,
+        content: 'Field "stock_count" returned as String ("42") rather than expected Integer (42). Strict client deserializers throwing unhandled FormatException.',
+        data: {
+          expected_type: 'integer',
+          observed_type: 'string',
+          sample_value: '"42"',
+        },
+        severity: 'critical',
+      },
+      {
+        id: 'ev_02_03',
+        title: 'Commit Origin Correlation',
+        type: 'deployment',
+        source: 'GitHub commit d8f1a2c by Sofia Petrov',
+        verified: true,
+        content: 'Commit d8f1a2c ("Add warehouse inventory integration") modified ProductSerializer to expose warehouse attributes without synchronizing the OpenAPI spec.',
+        data: {
+          commit: 'd8f1a2c',
+          author: 'Sofia Petrov',
+          branch: 'main',
+        },
+        severity: 'warning',
+      },
+      {
+        id: 'ev_02_04',
+        title: 'Mobile Consumer Deserialization Errors',
+        type: 'correlation',
+        source: 'Client-side crash reporting inference',
+        verified: false,
+        content: 'Android catalog parser reports 4.8% deserialization failure rate on product lists due to strict integer casting on stock_count.',
+        data: {
+          affected_clients: 'Android app v3.12',
+          failure_rate: '4.8%',
+        },
+        severity: 'critical',
+      },
+    ],
+    suggestedActions: [
+      'Update openapi.yaml schema to declare sku (string) and warehouse_id (string) in ProductItem definition',
+      'Fix stock_count type in products/serializers.py to serializers.IntegerField()',
+      'Add spectral / prism contract linting stage in CI pipeline',
+      'Run regression contract tests against staging environment',
+    ],
+    debugChecklist: [
+      { id: 'dc_02_1', label: 'Verify schema diff against openapi.yaml spec v2.1.0', completed: true, priority: 'high' },
+      { id: 'dc_02_2', label: 'Inspect Django ProductSerializer field definitions', completed: true, priority: 'high' },
+      { id: 'dc_02_3', label: 'Cast stock_count to serializers.IntegerField in serializer', completed: false, priority: 'high' },
+      { id: 'dc_02_4', label: 'Add sku and warehouse_id to OpenAPI specification', completed: false, priority: 'high' },
+      { id: 'dc_02_5', label: 'Deploy patch to staging and run contract validation suite', completed: false, priority: 'medium' },
+    ],
+    createdAt: subDays(now, 2).toISOString(),
+  },
+  {
+    id: 'inv_03',
+    incidentId: 'inc_03',
+    messages: [
+      {
+        id: 'msg_03_01',
+        role: 'assistant',
+        content: `I've completed an investigation into the **Payment 5xx Increase** on \`POST /api/payments/\`.
+
+### 1. Observed Evidence (Verified Facts)
+- **Error Rate Surge**: 5xx error rate rose from 0.45% baseline to 2.14% starting 5 hours ago (423 occurrences).
+- **Upstream Gateway Status**: Payment provider (Stripe) reported elevated 502 Bad Gateway responses during webhook delivery.
+- **Worker Saturation**: Celery \`payments_high\` queue backlog reached 184 jobs due to unthrottled immediate retries.
+
+### 2. Hypothesized Contributing Factors (Unconfirmed)
+- **Hypothesis 1 (Confidence: 91%)**: Upstream payment gateway experiencing transient gateway timeouts during charge authorization.
+- **Hypothesis 2 (Confidence: 68%)**: Missing exponential backoff causing webhook worker starvation.
+
+### 3. Recommended Actions
+1. Enable circuit breaker on upstream payment client with 15% trip threshold.
+2. Implement exponential backoff with jitter on Celery retry tasks.
+3. Route transient 502 responses to dead-letter queue for automated replay.`,
+        timestamp: subHours(now, 4.8).toISOString(),
+        evidenceRefs: ['ev_03_01', 'ev_03_02', 'ev_03_03'],
+      },
+      {
+        id: 'msg_03_02',
+        role: 'user',
+        content: 'What retry policy should we configure?',
+        timestamp: subHours(now, 4.5).toISOString(),
+      },
+      {
+        id: 'msg_03_03',
+        role: 'assistant',
+        content: `Configure Celery task with exponential backoff and jitter:
+
+\`\`\`python
+# payments/tasks.py
+@shared_task(bind=True, max_retries=5, default_retry_delay=2)
+def process_payment_confirmation(self, transaction_id):
+    try:
+        return payment_gateway.confirm_charge(transaction_id)
+    except GatewayTransientError as exc:
+        countdown = min(120, (2 ** self.request.retries) + random.uniform(0.5, 1.5))
+        raise self.retry(exc=exc, countdown=countdown)
+\`\`\`
+
+This prevents retry storms during upstream provider degradation and lets the \`payments_high\` worker pool process active requests normally.`,
+        timestamp: subHours(now, 4.3).toISOString(),
+        evidenceRefs: ['ev_03_03'],
+      },
+    ],
+    evidenceCards: [
+      {
+        id: 'ev_03_01',
+        title: 'Elevated 5xx Error Rate',
+        type: 'metric',
+        source: 'Telemetry timeseries (POST /api/payments/)',
+        verified: true,
+        content: 'Error rate jumped from 0.45% baseline to 2.14% over last 5 hours, generating 423 failed payment attempts.',
+        data: {
+          baseline_error_rate: 0.45,
+          observed_error_rate: 2.14,
+          total_failures: 423,
+        },
+        severity: 'critical',
+      },
+      {
+        id: 'ev_03_02',
+        title: 'Upstream Payment Gateway 502 Status',
+        type: 'log',
+        source: 'Stripe API status webhook log',
+        verified: true,
+        content: 'Upstream gateway returned HTTP 502 Bad Gateway on 389 authorization callbacks during European zone peak.',
+        data: {
+          gateway: 'Stripe API v2024-06',
+          status_code: 502,
+          gateway_latency_ms: 4800,
+        },
+        severity: 'critical',
+      },
+      {
+        id: 'ev_03_03',
+        title: 'Celery Webhook Queue Backlog',
+        type: 'metric',
+        source: 'Celery worker queue metrics (payments_high)',
+        verified: true,
+        content: 'Queue backlog reached 184 unacknowledged jobs due to synchronous retry loops without backoff delay.',
+        data: {
+          queue_depth: 184,
+          active_workers: 8,
+          retry_rate: '3.8x',
+        },
+        severity: 'warning',
+      },
+      {
+        id: 'ev_03_04',
+        title: 'Cross-Service Connection Contention',
+        type: 'correlation',
+        source: 'PostgreSQL connection pool contention model',
+        verified: false,
+        content: 'Database connection hold time on payments table elevated by 18% during lock acquisition.',
+        data: {
+          lock_wait_ms: 310,
+          pool_share: '15%',
+        },
+        severity: 'warning',
+      },
+    ],
+    suggestedActions: [
+      'Enable circuit breaker on payment gateway integration (15% error rate trip)',
+      'Add exponential backoff with jitter to Celery payment retry tasks',
+      'Route transient 502 failures to dead-letter queue for safe replay',
+      'Increase client timeout from 3,000ms to 8,000ms on charge verification calls',
+    ],
+    debugChecklist: [
+      { id: 'dc_03_1', label: 'Verify upstream provider status page for active incident', completed: true, priority: 'high' },
+      { id: 'dc_03_2', label: 'Confirm 502 error distribution in application logs', completed: true, priority: 'high' },
+      { id: 'dc_03_3', label: 'Deploy exponential backoff retry policy in Celery task', completed: false, priority: 'high' },
+      { id: 'dc_03_4', label: 'Configure circuit breaker threshold in payments client', completed: false, priority: 'medium' },
+      { id: 'dc_03_5', label: 'Drain payments_high queue after gateway recovery', completed: false, priority: 'medium' },
+    ],
+    createdAt: subHours(now, 4.8).toISOString(),
+  },
+  {
+    id: 'inv_04',
     incidentId: 'inc_04',
     messages: [
       {
-        id: 'msg_06',
+        id: 'msg_04_01',
         role: 'assistant',
-        content: `I've analyzed the **Auth Token Expiry Flood** incident. Here's the breakdown:\n\n**Summary:** POST /api/auth/refresh is experiencing a 4x increase in 401 Unauthorized errors since the deployment of **v1.8.3** (9 hours ago). The issue is caused by a JWT signing key rotation that didn't include backward compatibility.\n\n**Root Cause:**\n- Deploy v1.8.3 rotated the JWT signing key (RS256)\n- The JWKS endpoint was updated to serve only the **new** key\n- Existing tokens signed with the **old** key are failing verification\n- The auth middleware does not support multi-key verification\n\n**Impact:** ~2,105 token refresh failures affecting active user sessions. Users are being forced to re-authenticate.`,
+        content: `I've analyzed the **Auth Token Expiry Flood** incident on \`POST /api/auth/refresh\`.
+
+### 1. Observed Evidence (Verified Facts)
+- **Failure Surge**: 401 Unauthorized rate on \`/api/auth/refresh\` jumped from 0.3% to 1.24% following deploy of **v1.8.3** (9 hours ago).
+- **JWKS Endpoint Mismatch**: The \`/.well-known/jwks.json\` endpoint is serving only the newly rotated key (\`kid: "key-2026-11"\`).
+- **Old Key Removed**: Previous signing key (\`kid: "key-2026-08"\`) was immediately removed instead of retaining an expiration overlap window.
+- **Impact**: ~2,105 refresh failures affecting ~1,480 active user sessions.
+
+### 2. Hypothesized Contributing Factors (Unconfirmed)
+- **Hypothesis 1 (Confidence: 95%)**: Single-key JWKS endpoint rejects valid tokens signed with previous rotation key.
+- **Hypothesis 2 (Confidence: 76%)**: Auth middleware lacks backward-compatible multi-key verification fallback.
+
+### 3. Recommended Actions
+1. Re-add previous public key (\`kid: "key-2026-08"\`) to JWKS endpoint with 24h TTL.
+2. Configure JWT auth middleware to support multi-key verification ring.
+3. Update key rotation deployment checklist to mandate 48h key overlap period.`,
         timestamp: subHours(now, 7).toISOString(),
-        evidenceRefs: ['ev_06', 'ev_07'],
+        evidenceRefs: ['ev_04_01', 'ev_04_02', 'ev_04_03'],
       },
       {
-        id: 'msg_07',
+        id: 'msg_04_02',
         role: 'user',
         content: 'How many users are affected?',
         timestamp: subHours(now, 6.5).toISOString(),
       },
       {
-        id: 'msg_08',
+        id: 'msg_04_03',
         role: 'assistant',
-        content: `Based on the telemetry data:\n\n- **Total affected sessions:** ~2,105 unique token refresh failures\n- **Estimated unique users:** ~1,480 (some users retry multiple times)\n- **Sessions still valid:** Tokens issued after the key rotation are working normally\n- **Token TTL:** 1 hour — so all pre-rotation tokens will naturally expire within the next ~15 hours\n\nThe immediate fix is to add the old key back to the JWKS endpoint with a 24-hour TTL, allowing existing tokens to be verified until they expire naturally. This is the approach Sofia is implementing now.`,
+        content: `Based on auth audit telemetry:
+
+- **Total failed refresh attempts:** ~2,105 requests
+- **Unique user accounts affected:** ~1,480 unique IDs
+- **Token TTL:** 1 hour — remaining pre-rotation tokens will naturally expire within 15 hours
+- **Newly issued tokens:** Tokens issued post-v1.8.3 deployment are validating successfully
+
+Adding the previous public key back into the JWKS set immediately restores refresh token verification for active sessions.`,
         timestamp: subHours(now, 6.4).toISOString(),
-        evidenceRefs: ['ev_08'],
+        evidenceRefs: ['ev_04_03'],
       },
     ],
     evidenceCards: [
       {
-        id: 'ev_06',
+        id: 'ev_04_01',
         title: 'Token Refresh Failure Rate',
         type: 'metric',
+        source: 'Telemetry timeseries (POST /api/auth/refresh)',
+        verified: true,
         content: '401 error rate on /api/auth/refresh jumped from 0.3% to 1.24% immediately after deploy v1.8.3.',
         data: {
           baseline_error_rate: 0.3,
@@ -1216,10 +1528,12 @@ export const aiInvestigations: AIInvestigation[] = [
         severity: 'critical',
       },
       {
-        id: 'ev_07',
+        id: 'ev_04_02',
         title: 'JWKS Configuration',
         type: 'log',
-        content: 'The /.well-known/jwks.json endpoint is serving only 1 key (kid: "key-2026-11"). Previous key (kid: "key-2026-08") was removed instead of being marked with a future expiry.',
+        source: '/.well-known/jwks.json endpoint inspect',
+        verified: true,
+        content: 'The /.well-known/jwks.json endpoint is serving only 1 key (kid: "key-2026-11"). Previous key (kid: "key-2026-08") was removed prematurely.',
         data: {
           current_keys: 1,
           expected_keys: 2,
@@ -1228,14 +1542,29 @@ export const aiInvestigations: AIInvestigation[] = [
         severity: 'critical',
       },
       {
-        id: 'ev_08',
+        id: 'ev_04_03',
         title: 'Affected User Sessions',
         type: 'pattern',
+        source: 'Auth audit logs database',
+        verified: true,
         content: 'Analysis of failed refresh attempts shows 1,480 unique user IDs. All failures are for tokens issued before the key rotation timestamp.',
         data: {
           unique_users: 1480,
           total_failures: 2105,
           retry_rate: '1.42x',
+        },
+        severity: 'warning',
+      },
+      {
+        id: 'ev_04_04',
+        title: 'Client Refresh Storm Correlation',
+        type: 'correlation',
+        source: 'Client retry storm inference model',
+        verified: false,
+        content: 'Client SDKs retrying refresh 3-5 times before redirecting to login, inflating request volume by 42%.',
+        data: {
+          retry_inflation: '+42%',
+          client_reauth_rate: '68%',
         },
         severity: 'warning',
       },
@@ -1247,12 +1576,137 @@ export const aiInvestigations: AIInvestigation[] = [
       'Add integration test for key rotation scenario',
     ],
     debugChecklist: [
-      { id: 'dc_09', label: 'Verify JWKS endpoint configuration', completed: true, priority: 'high' },
-      { id: 'dc_10', label: 'Confirm old key removal as root cause', completed: true, priority: 'high' },
-      { id: 'dc_11', label: 'Add old key back to JWKS with TTL', completed: false, priority: 'high' },
-      { id: 'dc_12', label: 'Update middleware for multi-key support', completed: false, priority: 'medium' },
-      { id: 'dc_13', label: 'Document key rotation SOP', completed: false, priority: 'low' },
+      { id: 'dc_04_1', label: 'Verify JWKS endpoint configuration and active kid set', completed: true, priority: 'high' },
+      { id: 'dc_04_2', label: 'Confirm old key removal as root cause of 401s', completed: true, priority: 'high' },
+      { id: 'dc_04_3', label: 'Add old key back to JWKS with 24-hour TTL', completed: false, priority: 'high' },
+      { id: 'dc_04_4', label: 'Update auth middleware for multi-key key-ring support', completed: false, priority: 'medium' },
+      { id: 'dc_04_5', label: 'Document zero-downtime key rotation SOP in handbook', completed: false, priority: 'low' },
     ],
     createdAt: subHours(now, 7).toISOString(),
+  },
+  {
+    id: 'inv_05',
+    incidentId: 'inc_05',
+    messages: [
+      {
+        id: 'msg_05_01',
+        role: 'assistant',
+        content: `I've analyzed the **Search Index Degradation** on \`GET /api/search\`.
+
+### 1. Observed Evidence (Verified Facts)
+- **Latency Doubled**: P95 response time for \`GET /api/search\` doubled from 320ms to 680ms (P99: 1,100ms) over last 12 hours.
+- **Lucene Segment Merging**: Elasticsearch node stats show heavy segment merges following full schema index rebuild triggered by migration \`v4.12\`.
+- **Thread Pool Queue**: Search worker thread pool queue utilization is at 88% with intermittent rejected executions.
+- **Node CPU**: Cluster node CPU averages 86% across all 3 search data nodes.
+
+### 2. Hypothesized Contributing Factors (Unconfirmed)
+- **Hypothesis 1 (Confidence: 89%)**: Intensive segment merge disk I/O contention throttling query response times.
+- **Hypothesis 2 (Confidence: 65%)**: Search thread pool queue saturated due to heavy wildcard aggregations.
+
+### 3. Recommended Actions
+1. Throttle Elasticsearch segment merge I/O via cluster settings (\`max_bytes_per_sec: 40mb\`).
+2. Temporarily scale search replica nodes from 3 to 6 in Kubernetes cluster.
+3. Defer background indexing jobs until segment merge backlog completes.`,
+        timestamp: subHours(now, 11).toISOString(),
+        evidenceRefs: ['ev_05_01', 'ev_05_02', 'ev_05_03'],
+      },
+      {
+        id: 'msg_05_02',
+        role: 'user',
+        content: 'How do we throttle the merge operations?',
+        timestamp: subHours(now, 10.5).toISOString(),
+      },
+      {
+        id: 'msg_05_03',
+        role: 'assistant',
+        content: `Execute cluster settings update via Elasticsearch REST API:
+
+\`\`\`bash
+curl -X PUT "https://es-cluster.internal:9200/_cluster/settings" -H 'Content-Type: application/json' -d'
+{
+  "transient": {
+    "indices.store.throttle.max_bytes_per_sec": "40mb",
+    "index.merge.scheduler.max_thread_count": "1"
+  }
+}
+'
+\`\`\`
+
+This will immediately relieve disk I/O contention on the search nodes, restoring \`GET /api/search\` P95 latency to normal baseline (<350ms).`,
+        timestamp: subHours(now, 10.2).toISOString(),
+        evidenceRefs: ['ev_05_02'],
+      },
+    ],
+    evidenceCards: [
+      {
+        id: 'ev_05_01',
+        title: 'Search Latency Surge',
+        type: 'metric',
+        source: 'Telemetry timeseries (GET /api/search P95)',
+        verified: true,
+        content: 'P95 latency doubled from 320ms baseline to 680ms with P99 reaching 1,100ms during normal query traffic.',
+        data: {
+          baseline_p95: 320,
+          observed_p95: 680,
+          deviation: '2.1x',
+        },
+        severity: 'critical',
+      },
+      {
+        id: 'ev_05_02',
+        title: 'Elasticsearch Lucene Segment Merges',
+        type: 'log',
+        source: 'Elasticsearch _nodes/stats indices.segments',
+        verified: true,
+        content: 'Background segment merge I/O utilizing 82% of disk throughput following schema migration v4.12 index rebuild.',
+        data: {
+          active_merges: 14,
+          merge_io_mb_s: 185,
+          segments_total: 248,
+        },
+        severity: 'critical',
+      },
+      {
+        id: 'ev_05_03',
+        title: 'Search Thread Pool Queue Saturation',
+        type: 'metric',
+        source: 'Elasticsearch _cat/thread_pool',
+        verified: true,
+        content: 'Search thread pool queue depth peaked at 88% capacity with 156 tasks temporarily queued.',
+        data: {
+          queue_depth: 88,
+          rejected_tasks: 23,
+          active_threads: 32,
+        },
+        severity: 'warning',
+      },
+      {
+        id: 'ev_05_04',
+        title: 'Schema Migration Index Rebuild Event',
+        type: 'deployment',
+        source: 'Forge Analytics schema migration v4.12 job',
+        verified: true,
+        content: 'Migration v4.12 triggered full re-indexing of product_catalog index (12.4M documents).',
+        data: {
+          migration: 'v4.12-schema-rebuild',
+          documents_reindexed: 12400000,
+        },
+        severity: 'warning',
+      },
+    ],
+    suggestedActions: [
+      'Throttle Elasticsearch segment merge I/O via cluster settings',
+      'Scale search worker replica nodes in Kubernetes cluster',
+      'Defer non-critical bulk indexing jobs until segment merges complete',
+      'Add alerting on search thread pool rejected execution counts',
+    ],
+    debugChecklist: [
+      { id: 'dc_05_1', label: 'Inspect Elasticsearch cluster segment merge statistics', completed: true, priority: 'high' },
+      { id: 'dc_05_2', label: 'Verify search thread pool rejected task metrics', completed: true, priority: 'high' },
+      { id: 'dc_05_3', label: 'Throttle segment merge max_bytes_per_sec to 40mb', completed: false, priority: 'high' },
+      { id: 'dc_05_4', label: 'Scale Kubernetes search data pods from 3 to 6', completed: false, priority: 'medium' },
+      { id: 'dc_05_5', label: 'Validate P95 search latency recovery below 350ms', completed: false, priority: 'high' },
+    ],
+    createdAt: subHours(now, 11).toISOString(),
   },
 ]

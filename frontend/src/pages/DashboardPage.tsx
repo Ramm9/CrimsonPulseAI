@@ -62,7 +62,7 @@ export function DashboardPage() {
         <div className="flex items-center gap-2">
           <span className="flex h-2 w-2 rounded-full bg-cp-healthy animate-pulse" />
           <span className="text-xs font-mono text-cp-text-secondary">
-            All telemetry ingest pipelines healthy
+            Demo Telemetry Simulation Active
           </span>
         </div>
       </div>

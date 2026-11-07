@@ -42,7 +42,10 @@ export function EndpointDetailsPage() {
 
   useEffect(() => {
     async function loadEndpointData() {
-      if (!id) return
+      if (!id) {
+        setLoading(false)
+        return
+      }
       setLoading(true)
       try {
         const [ep, metricData, anomalyList, violationList] = await Promise.all([
@@ -274,7 +277,7 @@ export function EndpointDetailsPage() {
       <div className="rounded-xl border border-cp-border bg-cp-card overflow-hidden">
         <div className="p-4 border-b border-cp-border flex items-center justify-between">
           <h3 className="text-sm font-semibold text-cp-text">Sample Telemetry Requests</h3>
-          <span className="text-xs text-cp-text-secondary">Simulated real-time packet trace</span>
+          <span className="text-xs text-cp-text-secondary">Simulated real-time request telemetry stream</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-mono">

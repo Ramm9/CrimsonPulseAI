@@ -484,11 +484,16 @@ export function SettingsPage() {
 
                 <div>
                   <label className="block text-xs font-medium text-cp-text-secondary mb-1">
-                    Anomaly Detection Confidence Threshold (0.0 - 1.0)
+                    Anomaly Score Threshold (0.00 - 1.00)
                   </label>
+                  <span className="text-[10px] text-cp-text-secondary block mb-1.5">
+                    Isolation Forest decision threshold for anomaly alerts (recommended: 0.70)
+                  </span>
                   <input
                     type="number"
                     step="0.05"
+                    min="0"
+                    max="1"
                     value={anomalyThreshold}
                     onChange={(e) => setAnomalyThreshold(e.target.value)}
                     className="w-full rounded-lg border border-cp-border bg-cp-secondary px-3 py-2 text-xs font-mono text-cp-text focus:outline-none focus:border-cp-crimson"
@@ -501,7 +506,7 @@ export function SettingsPage() {
                       Auto-Create Incident on Critical Anomaly
                     </span>
                     <span className="text-[10px] text-cp-text-secondary">
-                      Automatically escalate high-confidence anomalies to incident triage
+                      Automatically escalate anomalies exceeding the score threshold to incident triage
                     </span>
                   </div>
                   <button

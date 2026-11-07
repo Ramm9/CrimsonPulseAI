@@ -42,7 +42,10 @@ export function IncidentDetailsPage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!id) return
+      if (!id) {
+        setLoading(false)
+        return
+      }
       setLoading(true)
       try {
         const item = await incidentService.getIncident(id)
@@ -207,7 +210,7 @@ export function IncidentDetailsPage() {
                 <Sparkles className="h-4 w-4" /> AI Investigation Summary
               </div>
               <button
-                onClick={() => navigate('/ai-investigator')}
+                onClick={() => navigate(`/ai-investigator?incident=${incident.id}`)}
                 className="inline-flex items-center gap-1 text-xs text-cp-crimson hover:underline font-medium"
               >
                 Open in AI Investigator <ArrowRight className="h-3 w-3" />

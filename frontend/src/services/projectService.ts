@@ -17,7 +17,14 @@ export async function getProjects(): Promise<Project[]> {
 export async function getProject(id: string): Promise<Project> {
   await simulateDelay()
 
-  const project = projects.find((p) => p.id === id)
+  const normalized = id.toLowerCase().replace(/[-_]/g, '')
+  const project = projects.find(
+    (p) =>
+      p.id === id ||
+      p.slug === id ||
+      p.id.toLowerCase().replace(/[-_]/g, '') === normalized ||
+      p.slug.toLowerCase().replace(/[-_]/g, '') === normalized,
+  )
   if (!project) {
     throw new Error(`Project not found: ${id}`)
   }

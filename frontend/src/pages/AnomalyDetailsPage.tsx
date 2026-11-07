@@ -11,6 +11,7 @@ import {
   ExternalLink,
   ShieldAlert,
   Server,
+  HelpCircle,
 } from 'lucide-react'
 import {
   LineChart,
@@ -39,7 +40,10 @@ export function AnomalyDetailsPage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!id) return
+      if (!id) {
+        setLoading(false)
+        return
+      }
       setLoading(true)
       try {
         const item = await anomalyService.getAnomaly(id)
@@ -170,11 +174,11 @@ export function AnomalyDetailsPage() {
         </div>
       </div>
 
-      {/* Model Confidence Notice Banner */}
+      {/* Model Anomaly Score Notice Banner */}
       <div className="flex items-center gap-2.5 rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-3 text-xs text-blue-300">
         <Sparkles className="h-4 w-4 shrink-0 text-blue-400" />
         <span>
-          Anomaly scores represent statistical deviations computed by isolation forests & autoencoders. They are model confidence scores, not probabilities of outage.
+          Anomaly scores represent statistical deviation scores computed by Scikit-Learn Isolation Forest models. They measure tree partition isolation depth, not probability of service failure or confidence percentage.
         </span>
       </div>
 
@@ -288,12 +292,23 @@ export function AnomalyDetailsPage() {
                 <span className="text-cp-text">{anomaly.modelVersion}</span>
               </div>
               <div className="flex justify-between border-b border-cp-border/50 pb-2">
-                <span className="text-cp-text-secondary font-sans">Confidence Score:</span>
-                <span className="text-cp-crimson font-bold">{(anomaly.anomalyScore * 100).toFixed(1)}%</span>
+                <span className="text-cp-text-secondary font-sans flex items-center gap-1">
+                  Anomaly Score:
+                  <span className="group/score relative inline-block cursor-help">
+                    <HelpCircle className="h-3 w-3 text-cp-text-secondary hover:text-cp-crimson" />
+                    <span className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-64 rounded-lg border border-cp-border bg-cp-elevated p-2 text-[11px] font-sans text-cp-text shadow-xl group-hover/score:block">
+                      Normalized Isolation Forest anomaly score (0.00 - 1.00) computed by scikit-learn. Measures partition isolation depth, not failure probability or confidence percentage.
+                    </span>
+                  </span>
+                </span>
+                <span className="text-cp-crimson font-bold font-mono">
+                  {anomaly.anomalyScore.toFixed(2)}{' '}
+                  <span className="text-[11px] font-normal text-cp-text-secondary">/ 1.00</span>
+                </span>
               </div>
               <div className="flex justify-between border-b border-cp-border/50 pb-2">
                 <span className="text-cp-text-secondary font-sans">Metric Tracked:</span>
-                <span className="text-cp-text">{anomaly.metric}</span>
+                <span className="text-cp-text">{anomaly.metric.replace(/_/g, ' ')}</span>
               </div>
               <div className="flex justify-between pb-1">
                 <span className="text-cp-text-secondary font-sans">Baseline Value:</span>
@@ -315,11 +330,11 @@ export function AnomalyDetailsPage() {
                 className="cursor-pointer rounded-lg border border-cp-border bg-cp-secondary p-3 hover:border-cp-crimson transition-colors"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-cp-text">Orders Latency Spike</span>
+                  <span className="text-xs font-semibold text-cp-text">Correlated Incident Ticket</span>
                   <ExternalLink className="h-3.5 w-3.5 text-cp-crimson" />
                 </div>
-                <div className="mt-1 text-[11px] text-cp-text-secondary">
-                  Active incident ticket #inc-001 • Open
+                <div className="mt-1 text-[11px] text-cp-text-secondary font-mono">
+                  #{anomaly.relatedIncidentId} • Click to open investigation
                 </div>
               </div>
             ) : (

@@ -13,6 +13,10 @@ import {
   CheckCircle2,
   FileCode,
   Layers,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  Lock,
 } from 'lucide-react'
 import { integrationService } from '@/services/integrationService'
 import type { ApiKey } from '@/types'
@@ -27,11 +31,14 @@ export function IntegrationsPage() {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
   const [activeTab, setActiveTab] = useState('python_sdk')
   const [copiedMap, setCopiedMap] = useState<Record<string, boolean>>({})
+  const [showKeyMap, setShowKeyMap] = useState<Record<string, boolean>>({})
 
   // Generate Key Modal
   const [keyModalOpen, setKeyModalOpen] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null)
+  const [showNewKey, setShowNewKey] = useState(true)
+  const [acknowledgedCopy, setAcknowledgedCopy] = useState(false)
 
   // Revoke Key state
   const [keyToRevoke, setKeyToRevoke] = useState<ApiKey | null>(null)
@@ -51,7 +58,6 @@ export function IntegrationsPage() {
       setCopiedMap((prev) => ({ ...prev, [key]: false }))
     }, 2000)
     addToast({
-      id: Math.random().toString(),
       type: 'success',
       title: 'Copied',
       message: 'Code snippet copied to clipboard',
@@ -63,12 +69,13 @@ export function IntegrationsPage() {
     if (!newKeyName.trim()) return
 
     const key = await integrationService.generateApiKey(newKeyName.trim())
-    setNewlyCreatedKey(key.key)
+    setNewlyCreatedKey(key.fullKey || key.key)
+    setShowNewKey(true)
+    setAcknowledgedCopy(false)
     const refreshed = await integrationService.getApiKeys()
     setApiKeys(refreshed)
     setNewKeyName('')
     addToast({
-      id: Math.random().toString(),
       type: 'success',
       title: 'API Key Created',
       message: `Key '${key.name}' generated. Copy the secret now.`,
@@ -82,7 +89,6 @@ export function IntegrationsPage() {
     setApiKeys(refreshed)
     setKeyToRevoke(null)
     addToast({
-      id: Math.random().toString(),
       type: 'info',
       title: 'Key Revoked',
       message: 'The selected API key has been revoked',
@@ -95,24 +101,30 @@ export function IntegrationsPage() {
     { id: 'manual_registration', label: 'Manual Discovery' },
   ]
 
-  const installCode = `pip install apisentinel-sdk`
+  const installCode = `pip install crimsonpulse-sdk`
+
+  const envExportCode = `export CRIMSONPULSE_PROJECT_KEY="YOUR_PROJECT_KEY"
+export CRIMSONPULSE_ENV="production"`
 
   const settingsCode = `# settings.py
-API_SENTINEL = {
+import os
+
+CRIMSONPULSE = {
     "ENABLED": True,
-    "PROJECT_KEY": "cpk_live_948f21e0ab4147",
-    "ENVIRONMENT": "production",
+    # Best practice: configure via environment variable (or replace with YOUR_PROJECT_KEY)
+    "PROJECT_KEY": os.environ.get("CRIMSONPULSE_PROJECT_KEY", "YOUR_PROJECT_KEY"),
+    "ENVIRONMENT": os.environ.get("CRIMSONPULSE_ENV", "production"),
     "SAMPLE_RATE": 1.0,
-    "CAPTURE_HEADERS": True,
+    "CAPTURE_HEADERS": False,  # Default False: never capture Authorization tokens, cookies, or secrets
 }`
 
   const middlewareCode = `# settings.py
 MIDDLEWARE = [
-    'apisentinel.middleware.APIMonitorMiddleware',
+    'crimsonpulse.middleware.PulseMonitoringMiddleware',
     # ... your existing middleware stack
 ]`
 
-  const verifyCode = `python manage.py apisentinel verify`
+  const verifyCode = `python manage.py crimsonpulse verify`
 
   return (
     <div className="space-y-6 pb-12">
@@ -138,11 +150,11 @@ MIDDLEWARE = [
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-base font-semibold text-cp-text">Telemetry Pipeline Connected</span>
+                <span className="text-base font-semibold text-cp-text">Demo Telemetry Simulation Active</span>
                 <span className="h-2 w-2 rounded-full bg-cp-healthy animate-pulse" />
               </div>
               <p className="text-xs text-cp-text-secondary">
-                Last heartbeat received <strong>2 minutes ago</strong> from Production cluster
+                Synthetic telemetry streaming in demo mode • Real connection status will appear after SDK backend deployment.
               </p>
             </div>
           </div>
@@ -195,7 +207,7 @@ MIDDLEWARE = [
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cp-crimson text-white text-[10px] font-bold">
                   2
                 </span>
-                Configure API_SENTINEL settings
+                Configure CRIMSONPULSE settings
               </h3>
               <button
                 onClick={() => copyText('settings', settingsCode)}
@@ -208,6 +220,34 @@ MIDDLEWARE = [
             <pre className="rounded-lg border border-cp-border bg-[#0D0E12] p-3 font-mono text-xs text-cp-text overflow-x-auto">
               {settingsCode}
             </pre>
+
+            {/* Environment variable export snippet */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-xs text-cp-text-secondary">
+                <span>Set your project key via shell or container environment:</span>
+                <button
+                  onClick={() => copyText('envExport', envExportCode)}
+                  className="inline-flex items-center gap-1 text-[11px] text-cp-crimson hover:underline"
+                >
+                  {copiedMap['envExport'] ? <Check className="h-3 w-3 text-cp-healthy" /> : <Copy className="h-3 w-3" />}
+                  {copiedMap['envExport'] ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <pre className="rounded-lg border border-cp-border/70 bg-[#0D0E12] p-2.5 font-mono text-[11px] text-cp-text-secondary overflow-x-auto">
+                {envExportCode}
+              </pre>
+            </div>
+
+            {/* SDK Security & Redaction Assurance Box */}
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3.5 text-xs text-cp-text space-y-1.5">
+              <div className="flex items-center gap-2 font-semibold text-cp-healthy">
+                <ShieldCheck className="h-4 w-4 shrink-0" />
+                <span>Credential Redaction & Zero-Secret Guarantee</span>
+              </div>
+              <p className="text-cp-text-secondary leading-relaxed">
+                <code className="text-cp-text font-mono">CAPTURE_HEADERS</code> is set to <code className="text-cp-healthy font-mono">False</code> by default. The CrimsonPulse SDK automatically scrubs sensitive HTTP headers (<code className="font-mono">Authorization</code>, <code className="font-mono">Proxy-Authorization</code>, <code className="font-mono">Cookie</code>, <code className="font-mono">Set-Cookie</code>, <code className="font-mono">X-Api-Key</code>, <code className="font-mono">X-Auth-Token</code>) client-side before any telemetry payload is dispatched. Bearer tokens, cookies, and secret values are never transmitted or stored.
+              </p>
+            </div>
           </div>
 
           {/* Step 3: Middleware */}
@@ -217,7 +257,7 @@ MIDDLEWARE = [
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cp-crimson text-white text-[10px] font-bold">
                   3
                 </span>
-                Register APIMonitorMiddleware
+                Register PulseMonitoringMiddleware
               </h3>
               <button
                 onClick={() => copyText('middleware', middlewareCode)}
@@ -331,13 +371,14 @@ MIDDLEWARE = [
               <Key className="h-4 w-4 text-cp-crimson" /> API Ingest Keys
             </h3>
             <p className="text-xs text-cp-text-secondary">
-              Authentication keys used by the SDK to transmit telemetry packets to CrimsonPulse AI
+              API ingest keys authenticate telemetry streams dispatched by the CrimsonPulse SDK to our ingestion pipeline
             </p>
           </div>
 
           <button
             onClick={() => {
               setNewlyCreatedKey(null)
+              setAcknowledgedCopy(false)
               setKeyModalOpen(true)
             }}
             className="inline-flex items-center gap-1.5 rounded-lg bg-cp-crimson px-3.5 py-2 text-xs font-semibold text-white hover:bg-cp-red transition-colors self-start sm:self-auto"
@@ -352,7 +393,7 @@ MIDDLEWARE = [
             <thead className="border-b border-cp-border bg-cp-secondary/80 text-cp-text-secondary uppercase">
               <tr>
                 <th className="py-2.5 px-4">Key Label</th>
-                <th className="py-2.5 px-4">Secret Prefix</th>
+                <th className="py-2.5 px-4">API Key Token</th>
                 <th className="py-2.5 px-4">Status</th>
                 <th className="py-2.5 px-4 text-right">Created</th>
                 <th className="py-2.5 px-4 text-right">Last Used</th>
@@ -360,40 +401,70 @@ MIDDLEWARE = [
               </tr>
             </thead>
             <tbody className="divide-y divide-cp-border/40 font-mono">
-              {apiKeys.map((k) => (
-                <tr key={k.id} className="hover:bg-cp-elevated/40">
-                  <td className="py-3 px-4 font-sans font-semibold text-cp-text">{k.name}</td>
-                  <td className="py-3 px-4 text-cp-text-secondary">{k.key}</td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded text-[10px] font-sans font-bold capitalize ${
-                        k.status === 'active'
-                          ? 'bg-cp-healthy/15 text-cp-healthy'
-                          : 'bg-cp-critical/15 text-cp-critical'
-                      }`}
-                    >
-                      {k.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-right text-cp-text-secondary font-sans">
-                    {formatRelativeTime(k.createdAt)}
-                  </td>
-                  <td className="py-3 px-4 text-right text-cp-text-secondary font-sans">
-                    {k.lastUsed ? formatRelativeTime(k.lastUsed) : 'Never'}
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    {k.status === 'active' && (
-                      <button
-                        onClick={() => setKeyToRevoke(k)}
-                        className="rounded p-1 text-cp-text-secondary hover:text-cp-critical hover:bg-cp-card transition-colors"
-                        title="Revoke key"
+              {apiKeys.map((k) => {
+                const isRevealed = Boolean(showKeyMap[k.id])
+                const displayKey = isRevealed ? k.key : `cpk_live_••••••••${k.key.slice(-4)}`
+                return (
+                  <tr key={k.id} className="hover:bg-cp-elevated/40">
+                    <td className="py-3 px-4 font-sans font-semibold text-cp-text">{k.name}</td>
+                    <td className="py-3 px-4 text-cp-text-secondary">
+                      <div className="flex items-center gap-2">
+                        <span>{displayKey}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowKeyMap((prev) => ({ ...prev, [k.id]: !prev[k.id] }))
+                          }
+                          className="rounded p-1 text-cp-text-secondary/70 hover:text-cp-text hover:bg-cp-elevated transition-colors"
+                          title={isRevealed ? 'Mask key' : 'Reveal key'}
+                        >
+                          {isRevealed ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => copyText(k.id, k.key)}
+                          className="rounded p-1 text-cp-text-secondary/70 hover:text-cp-text hover:bg-cp-elevated transition-colors"
+                          title="Copy key"
+                        >
+                          {copiedMap[k.id] ? (
+                            <Check className="h-3 w-3 text-cp-healthy" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-sans font-bold capitalize ${
+                          k.status === 'active'
+                            ? 'bg-cp-healthy/15 text-cp-healthy'
+                            : 'bg-cp-critical/15 text-cp-critical'
+                        }`}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                        {k.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right text-cp-text-secondary font-sans">
+                      {formatRelativeTime(k.createdAt)}
+                    </td>
+                    <td className="py-3 px-4 text-right text-cp-text-secondary font-sans">
+                      {k.lastUsed ? formatRelativeTime(k.lastUsed) : 'Never'}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {k.status === 'active' && (
+                        <button
+                          onClick={() => setKeyToRevoke(k)}
+                          className="rounded p-1 text-cp-text-secondary hover:text-cp-critical hover:bg-cp-card transition-colors"
+                          title="Revoke key"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -407,29 +478,64 @@ MIDDLEWARE = [
       >
         {newlyCreatedKey ? (
           <div className="space-y-4">
-            <div className="rounded-lg border border-cp-healthy/40 bg-cp-healthy/10 p-3 text-xs text-cp-healthy">
-              <strong>Key generated successfully!</strong> Store this key safely. You will not be able to see it again.
+            {/* Warning banner */}
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-300 space-y-1">
+              <div className="flex items-center gap-2 font-semibold text-amber-400">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>One-Time Secret Display Warning</span>
+              </div>
+              <p className="text-amber-300/80 leading-relaxed">
+                This secret API key is only displayed once. CrimsonPulse AI stores cryptographic hashes and cannot retrieve the raw token. Save this secret in your secure vault now.
+              </p>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-cp-text-secondary">Raw Secret Key</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type={showNewKey ? 'text' : 'password'}
+                  readOnly
+                  value={newlyCreatedKey}
+                  className="w-full rounded-lg border border-cp-border bg-cp-secondary px-3 py-2 font-mono text-xs text-cp-text select-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewKey(!showNewKey)}
+                  className="rounded-lg border border-cp-border bg-cp-elevated p-2 text-cp-text-secondary hover:text-cp-text hover:bg-cp-border transition-colors"
+                  title={showNewKey ? 'Hide key' : 'Show key'}
+                >
+                  {showNewKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyText('new_key', newlyCreatedKey)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-cp-elevated px-3 py-2 text-xs font-semibold text-cp-text hover:bg-cp-border border border-cp-border shrink-0 transition-colors"
+                >
+                  {copiedMap['new_key'] ? <Check className="h-4 w-4 text-cp-healthy" /> : <Copy className="h-4 w-4" />}
+                  {copiedMap['new_key'] ? 'Copied' : 'Copy Key'}
+                </button>
+              </div>
+            </div>
+
+            {/* Checkbox verification */}
+            <label className="flex items-start gap-2.5 cursor-pointer text-xs text-cp-text-secondary pt-1">
               <input
-                type="text"
-                readOnly
-                value={newlyCreatedKey}
-                className="w-full rounded-lg border border-cp-border bg-cp-secondary px-3 py-2 font-mono text-xs text-cp-text"
+                type="checkbox"
+                checked={acknowledgedCopy}
+                onChange={(e) => setAcknowledgedCopy(e.target.checked)}
+                className="mt-0.5 rounded border-cp-border bg-cp-secondary accent-cp-crimson"
               />
-              <button
-                onClick={() => copyText('new_key', newlyCreatedKey)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-cp-elevated px-3 py-2 text-xs font-semibold text-cp-text hover:bg-cp-border border border-cp-border"
-              >
-                {copiedMap['new_key'] ? <Check className="h-4 w-4 text-cp-healthy" /> : <Copy className="h-4 w-4" />}
-                {copiedMap['new_key'] ? 'Copied' : 'Copy'}
-              </button>
-            </div>
+              <span>
+                I have securely copied and stored this API key in a secure secrets manager or environment configuration.
+              </span>
+            </label>
+
             <button
               onClick={() => setKeyModalOpen(false)}
-              className="w-full rounded-lg bg-cp-crimson py-2 text-xs font-semibold text-white hover:bg-cp-red"
+              disabled={!acknowledgedCopy}
+              className="w-full rounded-lg bg-cp-crimson py-2 text-xs font-semibold text-white hover:bg-cp-red disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              Done
+              Done & Close Window
             </button>
           </div>
         ) : (

@@ -52,7 +52,16 @@ export async function getIncidents(filters?: IncidentFilters): Promise<Incident[
 export async function getIncident(id: string): Promise<Incident> {
   await simulateDelay()
 
-  const incident = incidents.find((inc) => inc.id === id)
+  const normalized = id.toLowerCase().replace(/[-_]/g, '')
+  const incident = incidents.find(
+    (inc) =>
+      inc.id === id ||
+      inc.id.toLowerCase().replace(/[-_]/g, '') === normalized ||
+      inc.id.replace('inc_', 'inc-00') === id ||
+      inc.id.replace('inc_', 'inc-0') === id ||
+      id.replace('inc-00', 'inc_') === inc.id ||
+      id.replace('inc-0', 'inc_') === inc.id,
+  )
   if (!incident) {
     throw new Error(`Incident not found: ${id}`)
   }

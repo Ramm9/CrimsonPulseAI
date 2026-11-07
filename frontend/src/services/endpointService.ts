@@ -62,7 +62,16 @@ export async function getEndpoints(
 export async function getEndpoint(id: string): Promise<Endpoint> {
   await simulateDelay()
 
-  const endpoint = endpoints.find((ep) => ep.id === id)
+  const normalized = id.toLowerCase().replace(/[-_]/g, '')
+  const endpoint = endpoints.find(
+    (ep) =>
+      ep.id === id ||
+      ep.id.toLowerCase().replace(/[-_]/g, '') === normalized ||
+      ep.id.replace('ep_', 'ep-00') === id ||
+      ep.id.replace('ep_', 'ep-0') === id ||
+      id.replace('ep-00', 'ep_') === ep.id ||
+      id.replace('ep-0', 'ep_') === ep.id,
+  )
   if (!endpoint) {
     throw new Error(`Endpoint not found: ${id}`)
   }

@@ -14,6 +14,12 @@ import {
   Check,
   Trash2,
   Save,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  Upload,
+  Radio,
+  FileCode,
 } from 'lucide-react'
 import {
   AreaChart,
@@ -52,6 +58,7 @@ export function ProjectDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [copiedKey, setCopiedKey] = useState(false)
+  const [showApiKey, setShowApiKey] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   // Settings form state
@@ -62,7 +69,10 @@ export function ProjectDetailsPage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!id) return
+      if (!id) {
+        setLoading(false)
+        return
+      }
       setLoading(true)
       try {
         const p = await projectService.getProject(id)
@@ -345,50 +355,79 @@ export function ProjectDetailsPage() {
               Endpoints automatically mapped by CrimsonPulse SDK telemetry
             </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-cp-border bg-cp-secondary/70 text-cp-text-secondary uppercase">
-                <tr>
-                  <th className="py-3 px-4">Method</th>
-                  <th className="py-3 px-4">Endpoint Path</th>
-                  <th className="py-3 px-4 text-right">Requests</th>
-                  <th className="py-3 px-4 text-right">P95 Latency</th>
-                  <th className="py-3 px-4 text-right">Error Rate</th>
-                  <th className="py-3 px-4 text-center">Health</th>
-                  <th className="py-3 px-4 text-right">Last Activity</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-cp-border/40 font-mono">
-                {endpoints.map((ep) => (
-                  <tr
-                    key={ep.id}
-                    onClick={() => navigate(`/api-explorer/${ep.id}`)}
-                    className="cursor-pointer hover:bg-cp-elevated/50 transition-colors"
-                  >
-                    <td className="py-3 px-4">
-                      <MethodBadge method={ep.method} />
-                    </td>
-                    <td className="py-3 px-4 font-semibold text-cp-text">{ep.path}</td>
-                    <td className="py-3 px-4 text-right text-cp-text">
-                      {formatNumber(ep.requestCount)}
-                    </td>
-                    <td className="py-3 px-4 text-right text-cp-text">
-                      {formatLatency(ep.p95Latency)}
-                    </td>
-                    <td className="py-3 px-4 text-right text-cp-text">
-                      {formatPercentage(ep.errorRate)}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <HealthBadge status={ep.health} />
-                    </td>
-                    <td className="py-3 px-4 text-right text-cp-text-secondary font-sans text-xs">
-                      {formatRelativeTime(ep.lastActivity)}
-                    </td>
+          {endpoints.length === 0 ? (
+            <div className="p-10 text-center space-y-4">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-cp-crimson/10 text-cp-crimson">
+                <Radio className="h-6 w-6" />
+              </div>
+              <div className="max-w-md mx-auto">
+                <h4 className="text-base font-semibold text-cp-text">Awaiting First Telemetry Ping</h4>
+                <p className="mt-1 text-xs text-cp-text-secondary leading-relaxed">
+                  No endpoints have been discovered yet for this project. Endpoints are automatically detected when your application runs with the CrimsonPulse Python SDK middleware.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => setActiveTab('integration')}
+                  className="inline-flex items-center gap-2 rounded-lg bg-cp-crimson px-4 py-2 text-xs font-semibold text-white hover:bg-cp-red transition-colors"
+                >
+                  <Plug className="h-3.5 w-3.5" /> View SDK Setup Guide
+                </button>
+                <button
+                  onClick={() => navigate('/contracts')}
+                  className="inline-flex items-center gap-2 rounded-lg border border-cp-border bg-cp-secondary px-4 py-2 text-xs font-semibold text-cp-text hover:bg-cp-elevated transition-colors"
+                >
+                  <Upload className="h-3.5 w-3.5" /> Import OpenAPI Spec
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-cp-border bg-cp-secondary/70 text-cp-text-secondary uppercase">
+                  <tr>
+                    <th className="py-3 px-4">Method</th>
+                    <th className="py-3 px-4">Endpoint Path</th>
+                    <th className="py-3 px-4 text-right">Requests</th>
+                    <th className="py-3 px-4 text-right">P95 Latency</th>
+                    <th className="py-3 px-4 text-right">Error Rate</th>
+                    <th className="py-3 px-4 text-center">Health</th>
+                    <th className="py-3 px-4 text-right">Last Activity</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-cp-border/40 font-mono">
+                  {endpoints.map((ep) => (
+                    <tr
+                      key={ep.id}
+                      onClick={() => navigate(`/api-explorer/${ep.id}`)}
+                      className="cursor-pointer hover:bg-cp-elevated/50 transition-colors"
+                    >
+                      <td className="py-3 px-4">
+                        <MethodBadge method={ep.method} />
+                      </td>
+                      <td className="py-3 px-4 font-semibold text-cp-text">{ep.path}</td>
+                      <td className="py-3 px-4 text-right text-cp-text">
+                        {formatNumber(ep.requestCount)}
+                      </td>
+                      <td className="py-3 px-4 text-right text-cp-text">
+                        {formatLatency(ep.p95Latency)}
+                      </td>
+                      <td className="py-3 px-4 text-right text-cp-text">
+                        {formatPercentage(ep.errorRate)}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <HealthBadge status={ep.health} />
+                      </td>
+                      <td className="py-3 px-4 text-right text-cp-text-secondary font-sans text-xs">
+                        {formatRelativeTime(ep.lastActivity)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -504,15 +543,23 @@ export function ProjectDetailsPage() {
           <div className="rounded-xl border border-cp-border bg-cp-card p-5">
             <h3 className="text-base font-semibold text-cp-text mb-2">Project API Key</h3>
             <p className="text-xs text-cp-text-secondary mb-4">
-              Pass this key to your CrimsonPulse Python SDK configuration.
+              Pass this key to your CrimsonPulse Python SDK configuration. Keep this key private.
             </p>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <input
-                type="text"
+                type={showApiKey ? 'text' : 'password'}
                 readOnly
-                value={project.apiKey}
+                value={showApiKey ? project.apiKey : `cpk_live_••••••••••••${project.apiKey.slice(-4)}`}
                 className="w-full max-w-lg rounded-lg border border-cp-border bg-cp-secondary px-3 py-2 font-mono text-xs text-cp-text"
               />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="rounded-lg border border-cp-border bg-cp-elevated p-2 text-cp-text-secondary hover:text-cp-text hover:bg-cp-border transition-colors"
+                title={showApiKey ? 'Hide key' : 'Show key'}
+              >
+                {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
               <button
                 onClick={handleCopyKey}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-cp-border bg-cp-elevated px-3 py-2 text-xs font-medium text-cp-text hover:bg-cp-border transition-colors"
@@ -523,25 +570,43 @@ export function ProjectDetailsPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-cp-border bg-cp-card p-5">
+          <div className="rounded-xl border border-cp-border bg-cp-card p-5 space-y-3">
             <h3 className="text-base font-semibold text-cp-text mb-2">Python SDK Configuration</h3>
             <p className="text-xs text-cp-text-secondary mb-4">
-              Add this block into your Django <code className="text-cp-crimson">settings.py</code>:
+              Add this block into your Django <code className="text-cp-crimson">settings.py</code> using an environment variable for the secret key:
             </p>
             <div className="relative rounded-lg border border-cp-border bg-[#0D0E12] p-4 font-mono text-xs text-cp-text overflow-x-auto">
               <pre>{`# settings.py
+import os
+
 CRIMSONPULSE = {
     "ENABLED": True,
-    "PROJECT_KEY": "${project.apiKey}",
-    "ENVIRONMENT": "${project.environment}",
+    # Best practice: inject via environment variable (or replace with YOUR_PROJECT_KEY)
+    "PROJECT_KEY": os.environ.get("CRIMSONPULSE_PROJECT_KEY", "YOUR_PROJECT_KEY"),
+    "ENVIRONMENT": os.environ.get("CRIMSONPULSE_ENV", "${project.environment}"),
     "SERVICE_NAME": "${project.slug}",
     "SAMPLE_RATE": 1.0,
+    "CAPTURE_HEADERS": False,  # Credential redaction active: Auth tokens & cookies never sent
 }
 
 MIDDLEWARE = [
     "crimsonpulse.middleware.PulseMonitoringMiddleware",
     # ... existing middleware
 ]`}</pre>
+            </div>
+
+            {/* Shell export example */}
+            <div className="rounded-lg border border-cp-border/70 bg-[#0D0E12] p-3 font-mono text-xs text-cp-text-secondary flex items-center justify-between">
+              <code>export CRIMSONPULSE_PROJECT_KEY="YOUR_PROJECT_KEY"</code>
+              <span className="text-[10px] font-sans text-cp-text-secondary">Shell / Container Env</span>
+            </div>
+
+            {/* Redaction Guarantee Note */}
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-cp-text-secondary flex items-start gap-2.5">
+              <ShieldCheck className="h-4 w-4 text-cp-healthy shrink-0 mt-0.5" />
+              <span>
+                <strong className="text-cp-healthy">Security policy:</strong> Never expose authorization tokens, cookies or sensitive credentials. The CrimsonPulse SDK automatically scrubs <code className="font-mono text-cp-text">Authorization</code>, <code className="font-mono text-cp-text">Cookie</code>, and custom secrets before dispatch.
+              </span>
             </div>
           </div>
         </div>

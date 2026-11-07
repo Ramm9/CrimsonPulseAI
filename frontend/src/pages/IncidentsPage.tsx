@@ -166,7 +166,19 @@ export function IncidentsPage() {
           ))
         ) : filteredIncidents.length === 0 ? (
           <div className="rounded-xl border border-cp-border bg-cp-card p-12 text-center text-sm text-cp-text-secondary">
-            No incidents found matching current filters.
+            <p>No incidents found matching current filters.</p>
+            {(search || severityFilter !== 'all' || statusFilter !== 'all') && (
+              <button
+                onClick={() => {
+                  setSearch('')
+                  setSeverityFilter('all')
+                  setStatusFilter('all')
+                }}
+                className="mt-3 rounded-lg border border-cp-border bg-cp-secondary px-3 py-1.5 text-xs text-cp-text hover:bg-cp-elevated transition-colors"
+              >
+                Reset Incident Filters
+              </button>
+            )}
           </div>
         ) : (
           filteredIncidents.map((inc) => (

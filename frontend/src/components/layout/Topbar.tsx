@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Menu,
@@ -14,6 +14,8 @@ import {
   Server,
   Cloud,
   Code2,
+  Database,
+  Info,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import { useAppStore } from '@/store/appStore'
@@ -102,6 +104,24 @@ export function Topbar({ onMobileMenuOpen }: TopbarProps) {
       </div>
 
       <div className="flex-1" />
+
+      {/* Simulated Telemetry / Demo Badge */}
+      <div className="group relative hidden lg:flex items-center">
+        <Link
+          to="/integrations"
+          className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-300 hover:border-amber-500/50 hover:bg-amber-500/15 transition-all"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+          <span className="font-mono text-[11px]">Simulated Telemetry (Demo)</span>
+          <Info className="h-3 w-3 text-amber-400/80" />
+        </Link>
+        <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-cp-border bg-cp-elevated px-3 py-2 text-xs text-cp-text shadow-xl opacity-0 transition-opacity group-hover:opacity-100">
+          <p className="font-semibold text-amber-300">Synthetic Observability Data</p>
+          <p className="mt-0.5 text-[11px] text-cp-text-secondary">
+            Displays realistic mock telemetry until the Python SDK backend is connected. Click to view SDK setup.
+          </p>
+        </div>
+      </div>
 
       {/* Environment Selector */}
       <div ref={envRef} className="relative hidden md:block">

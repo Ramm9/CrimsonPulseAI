@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import type { Incident, IncidentSeverity } from '@/types'
 import { cn } from '@/utils/cn'
 import { formatRelativeTime } from '@/utils/helpers'
@@ -28,9 +29,9 @@ export function IncidentSummaryCard({ incidents, className }: IncidentSummaryCar
   return (
     <div className={cn('space-y-1', className)}>
       {displayedIncidents.map((incident) => (
-        <a
+        <Link
           key={incident.id}
-          href={`/incidents/${incident.id}`}
+          to={`/incidents/${incident.id}`}
           className="group flex items-start gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-cp-elevated/50"
         >
           {/* Severity indicator */}
@@ -62,12 +63,12 @@ export function IncidentSummaryCard({ incidents, className }: IncidentSummaryCar
               {formatRelativeTime(incident.lastOccurred)}
             </p>
           </div>
-        </a>
+        </Link>
       ))}
 
       {/* View all link */}
-      <a
-        href="/incidents"
+      <Link
+        to="/incidents"
         className="group/link flex items-center gap-1.5 px-3 pt-2 text-xs font-medium text-cp-text-secondary transition-colors hover:text-cp-crimson"
       >
         View all incidents
@@ -75,7 +76,7 @@ export function IncidentSummaryCard({ incidents, className }: IncidentSummaryCar
           size={12}
           className="transition-transform group-hover/link:translate-x-0.5"
         />
-      </a>
+      </Link>
     </div>
   )
 }

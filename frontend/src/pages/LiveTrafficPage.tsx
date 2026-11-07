@@ -79,7 +79,8 @@ export function LiveTrafficPage() {
   })
 
   // Quick stats computed from current event buffer
-  const errorCount = events.filter((e) => e.statusCode >= 400).length
+  const serverErrors5xx = events.filter((e) => e.statusCode >= 500).length
+  const clientErrors4xx = events.filter((e) => e.statusCode >= 400 && e.statusCode < 500).length
   const avgResponse =
     events.length > 0
       ? Math.round(events.reduce((acc, e) => acc + e.responseTime, 0) / events.length)
@@ -145,25 +146,27 @@ export function LiveTrafficPage() {
       {/* KPI Stats Strip */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="rounded-xl border border-cp-border bg-cp-card p-4">
-          <div className="text-xs text-cp-text-secondary">BUFFERED EVENTS</div>
+          <div className="text-xs text-cp-text-secondary uppercase">BUFFERED REQUESTS</div>
           <div className="mt-1 text-xl font-bold font-mono text-cp-text">{events.length} / 100</div>
+          <div className="mt-0.5 text-[10px] text-cp-text-secondary">Rolling memory buffer</div>
         </div>
 
         <div className="rounded-xl border border-cp-border bg-cp-card p-4">
-          <div className="text-xs text-cp-text-secondary">AVG LATENCY</div>
+          <div className="text-xs text-cp-text-secondary uppercase">AVG LATENCY</div>
           <div className="mt-1 text-xl font-bold font-mono text-cp-healthy">{avgResponse} ms</div>
+          <div className="mt-0.5 text-[10px] text-cp-healthy">Nominal throughput</div>
         </div>
 
         <div className="rounded-xl border border-cp-border bg-cp-card p-4">
-          <div className="text-xs text-cp-text-secondary">FAILED PACKETS</div>
-          <div className="mt-1 text-xl font-bold font-mono text-cp-critical">{errorCount}</div>
+          <div className="text-xs text-cp-text-secondary uppercase">5xx SERVER FAULTS</div>
+          <div className="mt-1 text-xl font-bold font-mono text-cp-critical">{serverErrors5xx}</div>
+          <div className="mt-0.5 text-[10px] text-cp-critical">Critical infrastructure errors</div>
         </div>
 
         <div className="rounded-xl border border-cp-border bg-cp-card p-4">
-          <div className="text-xs text-cp-text-secondary">INGRESS STATUS</div>
-          <div className="mt-1 text-xl font-bold font-mono text-cp-healthy flex items-center gap-1.5">
-            <CheckCircle className="h-4 w-4" /> Healthy
-          </div>
+          <div className="text-xs text-cp-text-secondary uppercase">4xx CLIENT ERRORS</div>
+          <div className="mt-1 text-xl font-bold font-mono text-cp-warning">{clientErrors4xx}</div>
+          <div className="mt-0.5 text-[10px] text-cp-text-secondary">Expected route/auth client errors</div>
         </div>
       </div>
 
@@ -259,16 +262,27 @@ export function LiveTrafficPage() {
                       <td className="py-2 px-4 font-semibold text-cp-text">
                         {ev.endpoint}
                         {ev.error && (
-                          <div className="mt-0.5 text-[10px] text-cp-critical font-normal">
-                            {ev.error}
+                          <div
+                            className={`mt-0.5 text-[10px] font-normal ${
+                              is5xx ? 'text-cp-critical font-medium' : 'text-cp-warning'
+                            }`}
+                          >
+                            {is4xx ? `Client: ${ev.error}` : `Fault: ${ev.error}`}
                           </div>
                         )}
                       </td>
                       <td className="py-2 px-4 text-center">
                         <span
+                          title={
+                            is5xx
+                              ? 'HTTP 5xx: Server fault'
+                              : is4xx
+                              ? 'HTTP 4xx: Client request error'
+                              : 'HTTP 2xx: Success'
+                          }
                           className={`inline-block px-2 py-0.5 rounded font-bold text-[11px] ${
                             is5xx
-                              ? 'bg-cp-critical/15 text-cp-critical'
+                              ? 'bg-cp-critical/15 text-cp-critical border border-cp-critical/30'
                               : is4xx
                               ? 'bg-cp-warning/15 text-cp-warning'
                               : is2xx

@@ -502,7 +502,7 @@ const steps = [
     num: '01',
     title: 'Install the SDK',
     description: 'Add the lightweight SDK to your project with a single command.',
-    code: 'pip install apisentinel-sdk',
+    code: 'pip install crimsonpulse-sdk',
   },
   {
     num: '02',
@@ -648,11 +648,15 @@ function SDKSection() {
               <div className="p-5 font-mono text-sm leading-7 overflow-x-auto">
                 <CodeLine>
                   <span className="text-cp-text-secondary">
-                    {'# Django configuration'}
+                    {'# settings.py — environment variable configuration'}
                   </span>
                 </CodeLine>
                 <CodeLine>
-                  <span className="text-[#FF7B72]">API_SENTINEL</span>
+                  <span className="text-[#FF7B72]">import</span>
+                  <span className="text-cp-text-secondary">{' os'}</span>
+                </CodeLine>
+                <CodeLine>
+                  <span className="text-[#FF7B72]">CRIMSONPULSE</span>
                   <span className="text-cp-text-secondary">{' = {'}</span>
                 </CodeLine>
                 <CodeLine indent={1}>
@@ -664,15 +668,28 @@ function SDKSection() {
                 <CodeLine indent={1}>
                   <span className="text-[#A5D6FF]">{'"PROJECT_KEY"'}</span>
                   <span className="text-cp-text-secondary">: </span>
-                  <span className="text-[#A5D6FF]">
-                    {'"YOUR_PROJECT_KEY"'}
-                  </span>
+                  <span className="text-cp-text">{'os.environ.get('}</span>
+                  <span className="text-[#A5D6FF]">{'"CRIMSONPULSE_PROJECT_KEY"'}</span>
+                  <span className="text-cp-text-secondary">{', '}</span>
+                  <span className="text-[#A5D6FF]">{'"YOUR_PROJECT_KEY"'}</span>
+                  <span className="text-cp-text">{')'}</span>
                   <span className="text-cp-text-secondary">,</span>
                 </CodeLine>
                 <CodeLine indent={1}>
                   <span className="text-[#A5D6FF]">{'"ENVIRONMENT"'}</span>
                   <span className="text-cp-text-secondary">: </span>
+                  <span className="text-cp-text">{'os.environ.get('}</span>
+                  <span className="text-[#A5D6FF]">{'"CRIMSONPULSE_ENV"'}</span>
+                  <span className="text-cp-text-secondary">{', '}</span>
                   <span className="text-[#A5D6FF]">{'"production"'}</span>
+                  <span className="text-cp-text">{')'}</span>
+                  <span className="text-cp-text-secondary">,</span>
+                </CodeLine>
+                <CodeLine indent={1}>
+                  <span className="text-[#A5D6FF]">{'"CAPTURE_HEADERS"'}</span>
+                  <span className="text-cp-text-secondary">: </span>
+                  <span className="text-[#FF7B72]">False</span>
+                  <span className="text-cp-text-secondary">,  # Redacts auth tokens & cookies</span>
                 </CodeLine>
                 <CodeLine>
                   <span className="text-cp-text-secondary">{'}'}</span>
@@ -886,7 +903,7 @@ function PricingSection() {
                 'Custom retention',
                 'SSO & SAML',
                 'Dedicated support',
-                'SLA guarantee',
+                'Custom support agreements',
                 'On-prem option',
               ],
               cta: 'Contact Sales',
