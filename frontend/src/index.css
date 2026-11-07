@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #292C35 transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: #292C35;
+    border-radius: 3px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: #3a3e4a;
+  }
+
+  ::selection {
+    background-color: rgba(230, 57, 70, 0.3);
+    color: #F5F3F0;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #F5F3F0;
+    -webkit-box-shadow: 0 0 0px 1000px #17191F inset;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+}
+
+@layer components {
+  .cp-glow {
+    box-shadow: 0 0 20px rgba(230, 57, 70, 0.15);
+  }
+
+  .cp-glow-sm {
+    box-shadow: 0 0 10px rgba(230, 57, 70, 0.1);
+  }
+
+  .cp-gradient-text {
+    background: linear-gradient(135deg, #E63946, #FF4655);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .cp-card {
+    @apply bg-cp-card border border-cp-border rounded-lg;
+  }
+
+  .cp-card-hover {
+    @apply cp-card transition-all duration-200;
+  }
+
+  .cp-card-hover:hover {
+    border-color: rgba(230, 57, 70, 0.3);
+    box-shadow: 0 0 15px rgba(230, 57, 70, 0.05);
+  }
+
+  .cp-input {
+    @apply w-full bg-cp-secondary border border-cp-border rounded-md px-3 py-2 text-sm text-cp-text placeholder:text-cp-text-secondary/50 focus:outline-none focus:border-cp-crimson/50 focus:ring-1 focus:ring-cp-crimson/20 transition-colors;
+  }
+
+  .cp-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 bg-cp-crimson hover:bg-cp-red text-white font-medium text-sm rounded-md transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .cp-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 bg-cp-elevated hover:bg-cp-border text-cp-text font-medium text-sm rounded-md border border-cp-border transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .cp-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-3 py-1.5 text-cp-text-secondary hover:text-cp-text hover:bg-cp-elevated text-sm rounded-md transition-colors;
+  }
+
+  .cp-badge {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full;
+  }
+
+  .heartbeat-line {
+    animation: heartbeatLine 2s ease-in-out infinite;
+  }
+
+  @keyframes heartbeatLine {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Recharts custom styles */
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+
+.recharts-default-tooltip {
+  background-color: #1D2028 !important;
+  border: 1px solid #292C35 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+.recharts-tooltip-label {
+  color: #F5F3F0 !important;
+  font-weight: 500 !important;
+}
+
+.recharts-tooltip-item {
+  color: #969AA5 !important;
+}
+
