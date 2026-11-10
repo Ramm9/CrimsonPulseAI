@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { EnvironmentType, Notification } from '@/types'
+import type { EnvironmentType, Notification, Project } from '@/types'
 import { generateId } from '@/utils/helpers'
 
 export type TimeRange = '1h' | '6h' | '24h' | '7d' | '30d'
@@ -18,7 +18,15 @@ interface AppState {
   sidebarCollapsed: boolean
   toggleSidebar: () => void
 
-  // Project
+  // Backend Connection & Offline / Demo Mode
+  backendConnected: boolean | null
+  setBackendConnected: (connected: boolean) => void
+  isDemoMode: boolean
+  setDemoMode: (isDemo: boolean) => void
+
+  // Projects
+  projects: Project[]
+  setProjects: (projects: Project[]) => void
   currentProject: string | null
   setCurrentProject: (id: string | null) => void
 
@@ -54,7 +62,15 @@ export const useAppStore = create<AppState>((set) => ({
   sidebarCollapsed: false,
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
-  // Project
+  // Backend Connection & Offline / Demo Mode
+  backendConnected: false,
+  setBackendConnected: (connected) => set({ backendConnected: connected, isDemoMode: !connected }),
+  isDemoMode: true,
+  setDemoMode: (isDemo) => set({ isDemoMode: isDemo }),
+
+  // Projects
+  projects: [],
+  setProjects: (projects) => set({ projects }),
   currentProject: null,
   setCurrentProject: (id) => set({ currentProject: id }),
 

@@ -1,35 +1,164 @@
-import { simulateDelay } from '@/services/api'
+import { apiClient, isDemoModeActive, simulateDelay } from '@/services/api'
 import { telemetryEvents, trafficMetrics } from '@/mock/data'
 import type { TelemetryEvent, MetricWindow } from '@/types'
 import { generateId } from '@/utils/helpers'
+
+export interface DashboardSummary {
+  totalRequests: number
+  appRequests?: number
+  preflightRequests?: number
+  avgLatency: number
+  p50Latency?: number
+  p95Latency: number
+  p99Latency?: number
+  errorRate: number
+  clientErrorRate?: number
+  serverErrorRate?: number
+  totalEndpoints: number
+  healthyEndpoints: number
+  requestsChange?: number
+  errorRateChange?: number
+  p95Change?: number
+  lastEventTimestamp?: string | null
+  timeRange?: string
+  environment?: string
+  policy?: string
+}
+
+/**
+ * Get high-level system overview summary from Django backend.
+ */
+export async function getDashboardSummary(
+  projectId?: string,
+  environment?: string,
+  timeRange: string = '24h',
+): Promise<DashboardSummary> {
+  try {
+    const params: Record<string, string> = { timeRange }
+    if (projectId) params.projectId = projectId
+    if (environment && environment !== 'all') params.environment = environment
+
+    const res = await apiClient.get<DashboardSummary>('/metrics/dashboard/', { params })
+    if (res.data && typeof res.data.totalRequests === 'number') {
+      return res.data
+    }
+  } catch {
+    if (!isDemoModeActive()) {
+      return {
+        totalRequests: 0,
+        avgLatency: 0,
+        p95Latency: 0,
+        errorRate: 0,
+        totalEndpoints: 0,
+        healthyEndpoints: 0,
+        requestsChange: 0,
+        errorRateChange: 0,
+        p95Change: 0,
+        lastEventTimestamp: null,
+      }
+    }
+  }
+
+  if (isDemoModeActive()) {
+    await simulateDelay()
+    return {
+      totalRequests: 1_280_000,
+      avgLatency: 80,
+      p95Latency: 184,
+      errorRate: 0.42,
+      totalEndpoints: 14,
+      healthyEndpoints: 12,
+      requestsChange: 12.5,
+      errorRateChange: -0.08,
+      p95Change: 2.1,
+      lastEventTimestamp: new Date().toISOString(),
+    }
+  }
+
+  return {
+    totalRequests: 0,
+    avgLatency: 0,
+    p95Latency: 0,
+    errorRate: 0,
+    totalEndpoints: 0,
+    healthyEndpoints: 0,
+    requestsChange: 0,
+    errorRateChange: 0,
+    p95Change: 0,
+    lastEventTimestamp: null,
+  }
+}
 
 /**
  * Get traffic metrics for the dashboard charts.
  */
 export async function getTrafficMetrics(
   timeRange: string = '24h',
+  projectId?: string,
+  environment?: string,
 ): Promise<MetricWindow[]> {
-  await simulateDelay()
+  try {
+    const params: Record<string, string> = { timeRange }
+    if (projectId) params.projectId = projectId
+    if (environment && environment !== 'all') params.environment = environment
 
-  const hoursMap: Record<string, number> = {
-    '1h': 1,
-    '6h': 6,
-    '12h': 12,
-    '24h': 24,
-    '7d': 24,
-    '30d': 24,
+    const res = await apiClient.get<MetricWindow[]>('/metrics/traffic/', { params })
+    if (Array.isArray(res.data)) {
+      return res.data
+    }
+  } catch {
+    if (!isDemoModeActive()) {
+      return []
+    }
   }
 
-  const hours = hoursMap[timeRange] || 24
-  return trafficMetrics.slice(0, hours)
+  if (isDemoModeActive()) {
+    await simulateDelay()
+
+    const hoursMap: Record<string, number> = {
+      '1h': 1,
+      '6h': 6,
+      '12h': 12,
+      '24h': 24,
+      '7d': 24,
+      '30d': 24,
+    }
+
+    const hours = hoursMap[timeRange] || 24
+    return trafficMetrics.slice(0, hours)
+  }
+
+  return []
 }
 
 /**
  * Get recent telemetry events (live traffic feed).
  */
-export async function getLiveTraffic(limit = 30): Promise<TelemetryEvent[]> {
-  await simulateDelay(200, 500)
-  return telemetryEvents.slice(0, limit)
+export async function getLiveTraffic(limit = 30, projectId?: string): Promise<TelemetryEvent[]> {
+  try {
+    const params: Record<string, string | number> = { limit }
+    if (projectId) params.projectId = projectId
+
+    const res = await apiClient.get<TelemetryEvent[]>('/traffic/', { params })
+    if (Array.isArray(res.data)) {
+      return res.data
+    }
+  } catch {
+    if (!isDemoModeActive()) {
+      return []
+    }
+  }
+
+  if (isDemoModeActive()) {
+    await simulateDelay(200, 500)
+    let feed = [...telemetryEvents]
+    if (projectId) {
+      feed = feed.filter((e) => e.projectId === projectId || e.projectId.replace('proj_', 'proj-') === projectId)
+    }
+    return feed.slice(0, limit)
+  }
+
+  return []
 }
 
 // Paths and weights for realistic event generation
@@ -56,7 +185,6 @@ const eventTemplates: Array<{
   { path: '/api/analytics/reports', method: 'GET', projectId: 'proj_05', weight: 1, baseLatency: 340 },
 ]
 
-// Build weighted selection array
 const weightedTemplates: typeof eventTemplates = []
 for (const t of eventTemplates) {
   for (let i = 0; i < t.weight; i++) {
@@ -73,11 +201,15 @@ function pickRandomStatus(): number {
 }
 
 /**
- * Generate a single live telemetry event.
- * Used by the real-time traffic feed to add new events.
+ * Generate a single live telemetry event (Demo mode only).
  */
-export function generateLiveEvent(): TelemetryEvent {
-  const template = weightedTemplates[Math.floor(Math.random() * weightedTemplates.length)]
+export function generateLiveEvent(projectId?: string): TelemetryEvent {
+  const eligibleTemplates = projectId
+    ? weightedTemplates.filter((t) => t.projectId === projectId || t.projectId.replace('proj_', 'proj-') === projectId)
+    : weightedTemplates
+
+  const source = eligibleTemplates.length > 0 ? eligibleTemplates : weightedTemplates
+  const template = source[Math.floor(Math.random() * source.length)]
   const statusCode = pickRandomStatus()
   const isError = statusCode >= 500
   const isOrdersSpike = template.path === '/api/orders/' && Math.random() < 0.4
@@ -111,10 +243,7 @@ export function generateLiveEvent(): TelemetryEvent {
       : undefined,
   }
 
-  // Add to the front of the telemetry events array
   telemetryEvents.unshift(event)
-
-  // Keep array bounded
   if (telemetryEvents.length > 200) {
     telemetryEvents.length = 200
   }
@@ -123,6 +252,7 @@ export function generateLiveEvent(): TelemetryEvent {
 }
 
 export const telemetryService = {
+  getDashboardSummary,
   getTrafficMetrics,
   getLiveTraffic,
   generateLiveEvent,

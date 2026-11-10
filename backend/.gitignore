@@ -1,0 +1,15 @@
+# Backend-specific ignore rules
+.env
+.env.*
+!.env.example
+*.sqlite3
+*.sqlite3-journal
+*.db
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+staticfiles/
+media/
+celerybeat-schedule
+

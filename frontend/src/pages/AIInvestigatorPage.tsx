@@ -29,6 +29,7 @@ import { SeverityBadge } from '@/components/shared/SeverityBadge'
 import { MethodBadge } from '@/components/shared/MethodBadge'
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 import { formatRelativeTime } from '@/utils/helpers'
+import { useAppStore } from '@/store/appStore'
 
 type EvidenceFilterType = 'all' | 'metric' | 'log' | 'trace' | 'deployment'
 
@@ -147,6 +148,7 @@ const mockHypotheses: Record<string, Hypothesis[]> = {
 export function AIInvestigatorPage() {
   const [searchParams] = useSearchParams()
   const location = useLocation()
+  const currentProject = useAppStore((s) => s.currentProject)
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [messages, setMessages] = useState<AIMessage[]>([])
@@ -163,7 +165,7 @@ export function AIInvestigatorPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const incList = await incidentService.getIncidents()
+        const incList = await incidentService.getIncidents({ projectId: currentProject || undefined })
         setIncidents(incList)
         if (incList.length > 0) {
           const targetId =
@@ -173,13 +175,18 @@ export function AIInvestigatorPage() {
           const initialInc = matched || incList[0]
           setSelectedIncident(initialInc)
           loadInvestigation(initialInc.id, initialInc)
+        } else {
+          setSelectedIncident(null)
+          setMessages([])
+          setEvidenceCards([])
+          setChecklist([])
         }
       } catch (err) {
         console.error('Failed to load incidents:', err)
       }
     }
     loadData()
-  }, [searchParams, location.state])
+  }, [searchParams, location.state, currentProject])
 
   const loadInvestigation = async (incidentId: string, currentInc?: Incident) => {
     setIsLoadingInvestigation(true)

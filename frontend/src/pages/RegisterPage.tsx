@@ -4,8 +4,9 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
-import { Activity, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Activity, Eye, EyeOff, Loader2, AlertTriangle } from 'lucide-react'
 import { cn } from '@/utils/cn'
+import { authService } from '@/services/authService'
 
 /* ------------------------------------------------------------------ */
 /* Validation schema                                                   */
@@ -93,6 +94,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
 
   const {
     register,
@@ -104,22 +106,20 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true)
+    setAuthError(null)
 
-    // Simulate registration delay
-    await new Promise((resolve) => setTimeout(resolve, 1200))
-
-    const user = {
-      id: 'usr-' + Date.now(),
-      name: data.name,
-      email: data.email,
-      role: 'owner' as const,
-      createdAt: new Date().toISOString(),
+    try {
+      await authService.register({
+        name: data.name,
+        email: data.email,
+        password: data.password,
+      })
+      setIsLoading(false)
+      navigate('/dashboard')
+    } catch (err: any) {
+      setIsLoading(false)
+      setAuthError(err.message || 'Registration failed. Please try again.')
     }
-    localStorage.setItem('cp_user', JSON.stringify(user))
-    localStorage.setItem('cp_auth', 'true')
-
-    setIsLoading(false)
-    navigate('/dashboard')
   }
 
   return (
@@ -155,6 +155,13 @@ export default function RegisterPage() {
               Get started with CrimsonPulse AI for free
             </p>
           </div>
+
+          {authError && (
+            <div className="mt-6 flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3.5 text-sm text-red-400">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" />
+              <div className="flex-1 leading-snug">{authError}</div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5">
             {/* Full name */}

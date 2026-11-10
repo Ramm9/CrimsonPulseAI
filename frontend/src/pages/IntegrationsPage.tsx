@@ -42,6 +42,35 @@ export function IntegrationsPage() {
 
   // Revoke Key state
   const [keyToRevoke, setKeyToRevoke] = useState<ApiKey | null>(null)
+  const [rotatingKeyId, setRotatingKeyId] = useState<string | null>(null)
+
+  const handleRotateKey = async (k: ApiKey) => {
+    try {
+      setRotatingKeyId(k.id)
+      const res = await integrationService.rotateApiKey(k.id)
+      setNewlyCreatedKey(res.fullKey)
+      setShowNewKey(true)
+      setAcknowledgedCopy(false)
+      setKeyModalOpen(true)
+      const updatedKeys = await integrationService.getApiKeys()
+      setApiKeys(updatedKeys)
+      addToast({
+        id: Math.random().toString(),
+        type: 'success',
+        title: 'Key Rotated',
+        message: `API key "${k.name}" rotated. Copy the new secret token now.`,
+      })
+    } catch (err: any) {
+      addToast({
+        id: Math.random().toString(),
+        type: 'error',
+        title: 'Rotation Failed',
+        message: err.message || 'Failed to rotate key.',
+      })
+    } finally {
+      setRotatingKeyId(null)
+    }
+  }
 
   useEffect(() => {
     async function loadKeys() {
@@ -104,23 +133,30 @@ export function IntegrationsPage() {
   const installCode = `pip install crimsonpulse-sdk`
 
   const envExportCode = `export CRIMSONPULSE_PROJECT_KEY="YOUR_PROJECT_KEY"
-export CRIMSONPULSE_ENV="production"`
+export CRIMSONPULSE_API_URL="http://127.0.0.1:8000/api/v1/ingest/events/"
+export CRIMSONPULSE_ENV="development"`
 
   const settingsCode = `# settings.py
 import os
 
-CRIMSONPULSE = {
+CRIMSONPULSE_CONFIG = {
     "ENABLED": True,
     # Best practice: configure via environment variable (or replace with YOUR_PROJECT_KEY)
-    "PROJECT_KEY": os.environ.get("CRIMSONPULSE_PROJECT_KEY", "YOUR_PROJECT_KEY"),
-    "ENVIRONMENT": os.environ.get("CRIMSONPULSE_ENV", "production"),
-    "SAMPLE_RATE": 1.0,
+    "API_KEY": os.environ.get("CRIMSONPULSE_PROJECT_KEY", "YOUR_PROJECT_KEY"),
+    "API_URL": os.environ.get("CRIMSONPULSE_API_URL", "http://127.0.0.1:8000/api/v1/ingest/events/"),
+    "ENVIRONMENT": os.environ.get("CRIMSONPULSE_ENV", "development"),
     "CAPTURE_HEADERS": False,  # Default False: never capture Authorization tokens, cookies, or secrets
-}`
+}
+
+# Add CrimsonPulseMiddleware to the top of MIDDLEWARE for accurate latency
+MIDDLEWARE = [
+    'crimsonpulse.middleware.CrimsonPulseMiddleware',
+    # ... your existing middleware stack
+]`
 
   const middlewareCode = `# settings.py
 MIDDLEWARE = [
-    'crimsonpulse.middleware.PulseMonitoringMiddleware',
+    'crimsonpulse.middleware.CrimsonPulseMiddleware',
     # ... your existing middleware stack
 ]`
 
@@ -257,7 +293,7 @@ MIDDLEWARE = [
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cp-crimson text-white text-[10px] font-bold">
                   3
                 </span>
-                Register PulseMonitoringMiddleware
+                Register CrimsonPulseMiddleware
               </h3>
               <button
                 onClick={() => copyText('middleware', middlewareCode)}
@@ -402,29 +438,23 @@ MIDDLEWARE = [
             </thead>
             <tbody className="divide-y divide-cp-border/40 font-mono">
               {apiKeys.map((k) => {
-                const isRevealed = Boolean(showKeyMap[k.id])
-                const displayKey = isRevealed ? k.key : `cpk_live_••••••••${k.key.slice(-4)}`
                 return (
                   <tr key={k.id} className="hover:bg-cp-elevated/40">
                     <td className="py-3 px-4 font-sans font-semibold text-cp-text">{k.name}</td>
                     <td className="py-3 px-4 text-cp-text-secondary">
                       <div className="flex items-center gap-2">
-                        <span>{displayKey}</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setShowKeyMap((prev) => ({ ...prev, [k.id]: !prev[k.id] }))
-                          }
-                          className="rounded p-1 text-cp-text-secondary/70 hover:text-cp-text hover:bg-cp-elevated transition-colors"
-                          title={isRevealed ? 'Mask key' : 'Reveal key'}
+                        <span className="font-mono text-cp-text">{k.key}</span>
+                        <span
+                          className="inline-flex items-center gap-1 rounded bg-cp-elevated px-1.5 py-0.5 text-[10px] text-cp-text-secondary"
+                          title="Stored securely as SHA-256 hash. Plaintext secret is never readable after generation."
                         >
-                          {isRevealed ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                        </button>
+                          <Lock className="h-2.5 w-2.5 text-cp-text-secondary" /> Hashed
+                        </span>
                         <button
                           type="button"
                           onClick={() => copyText(k.id, k.key)}
                           className="rounded p-1 text-cp-text-secondary/70 hover:text-cp-text hover:bg-cp-elevated transition-colors"
-                          title="Copy key"
+                          title="Copy masked identifier"
                         >
                           {copiedMap[k.id] ? (
                             <Check className="h-3 w-3 text-cp-healthy" />
@@ -453,13 +483,23 @@ MIDDLEWARE = [
                     </td>
                     <td className="py-3 px-4 text-center">
                       {k.status === 'active' && (
-                        <button
-                          onClick={() => setKeyToRevoke(k)}
-                          className="rounded p-1 text-cp-text-secondary hover:text-cp-critical hover:bg-cp-card transition-colors"
-                          title="Revoke key"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => handleRotateKey(k)}
+                            disabled={rotatingKeyId === k.id}
+                            className="rounded p-1.5 text-cp-text-secondary hover:text-cp-warning hover:bg-cp-elevated transition-colors"
+                            title="Rotate key (immediately revokes old key and issues new token)"
+                          >
+                            <RefreshCw className={`h-3.5 w-3.5 ${rotatingKeyId === k.id ? 'animate-spin' : ''}`} />
+                          </button>
+                          <button
+                            onClick={() => setKeyToRevoke(k)}
+                            className="rounded p-1.5 text-cp-text-secondary hover:text-cp-critical hover:bg-cp-elevated transition-colors"
+                            title="Revoke key"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>

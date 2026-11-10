@@ -20,6 +20,9 @@ import {
   Upload,
   Radio,
   FileCode,
+  Key,
+  RefreshCw,
+  Lock,
 } from 'lucide-react'
 import {
   AreaChart,
@@ -42,6 +45,7 @@ import { MethodBadge } from '@/components/shared/MethodBadge'
 import { SeverityBadge } from '@/components/shared/SeverityBadge'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Tabs } from '@/components/shared/Tabs'
+import { Modal } from '@/components/shared/Modal'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { formatNumber, formatLatency, formatPercentage, formatRelativeTime } from '@/utils/helpers'
 import { useAppStore } from '@/store/appStore'
@@ -49,7 +53,7 @@ import { useAppStore } from '@/store/appStore'
 export function ProjectDetailsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { addToast } = useAppStore()
+  const { addToast, setCurrentProject } = useAppStore()
 
   const [project, setProject] = useState<Project | null>(null)
   const [endpoints, setEndpoints] = useState<Endpoint[]>([])
@@ -58,8 +62,12 @@ export function ProjectDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [copiedKey, setCopiedKey] = useState(false)
-  const [showApiKey, setShowApiKey] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [projectKeys, setProjectKeys] = useState<any[]>([])
+  const [rotatingKey, setRotatingKey] = useState(false)
+  const [rotatedKeySecret, setRotatedKeySecret] = useState<string | null>(null)
+  const [showRotatedSecretModal, setShowRotatedSecretModal] = useState(false)
+  const [copiedRotatedKey, setCopiedRotatedKey] = useState(false)
 
   // Settings form state
   const [formName, setFormName] = useState('')
@@ -73,9 +81,16 @@ export function ProjectDetailsPage() {
         setLoading(false)
         return
       }
+      setCurrentProject(id)
       setLoading(true)
       try {
-        const p = await projectService.getProject(id)
+        const [p, keys, epList, incList, metricData] = await Promise.all([
+          projectService.getProject(id),
+          projectService.getProjectKeys(id),
+          endpointService.getEndpoints(id),
+          incidentService.getIncidents({ projectId: id }),
+          telemetryService.getTrafficMetrics('24h', id),
+        ])
         if (p) {
           setProject(p)
           setFormName(p.name)
@@ -83,12 +98,7 @@ export function ProjectDetailsPage() {
           setFormBaseUrl(p.baseUrl)
           setFormEnv(p.environment)
         }
-
-        const [epList, incList, metricData] = await Promise.all([
-          endpointService.getEndpoints(id),
-          incidentService.getIncidents({ projectId: id }),
-          telemetryService.getTrafficMetrics('24h'),
-        ])
+        setProjectKeys(keys || [])
         setEndpoints(epList)
         setIncidents(incList)
         setMetrics(metricData)
@@ -112,6 +122,50 @@ export function ProjectDetailsPage() {
       title: 'Copied',
       message: 'Project API key copied to clipboard',
     })
+  }
+
+  const handleRotateProjectKey = async () => {
+    if (!project) return
+    const activeKey = projectKeys.find((k) => k.status === 'active') || projectKeys[0]
+    const keyIdToRotate = activeKey ? activeKey.id : null
+
+    if (!keyIdToRotate) {
+      addToast({
+        id: Math.random().toString(),
+        type: 'error',
+        title: 'Key Not Found',
+        message: 'No project key ID available to rotate. Please manage keys via Integrations.',
+      })
+      return
+    }
+
+    try {
+      setRotatingKey(true)
+      const res = await projectService.rotateProjectKey(project.id, keyIdToRotate)
+      setRotatedKeySecret(res.fullKey)
+      setShowRotatedSecretModal(true)
+      const [updatedProject, updatedKeys] = await Promise.all([
+        projectService.getProject(project.id),
+        projectService.getProjectKeys(project.id),
+      ])
+      if (updatedProject) setProject(updatedProject)
+      setProjectKeys(updatedKeys || [])
+      addToast({
+        id: Math.random().toString(),
+        type: 'success',
+        title: 'Key Rotated',
+        message: 'New secret key generated. Copy it now.',
+      })
+    } catch (err: any) {
+      addToast({
+        id: Math.random().toString(),
+        type: 'error',
+        title: 'Rotation Failed',
+        message: err.message || 'Failed to rotate project key.',
+      })
+    } finally {
+      setRotatingKey(false)
+    }
   }
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -540,34 +594,59 @@ export function ProjectDetailsPage() {
       {/* TAB 5: INTEGRATIONS */}
       {activeTab === 'integrations' && (
         <div className="space-y-6">
-          <div className="rounded-xl border border-cp-border bg-cp-card p-5">
-            <h3 className="text-base font-semibold text-cp-text mb-2">Project API Key</h3>
-            <p className="text-xs text-cp-text-secondary mb-4">
-              Pass this key to your CrimsonPulse Python SDK configuration. Keep this key private.
-            </p>
-            <div className="flex items-center gap-2">
-              <input
-                type={showApiKey ? 'text' : 'password'}
-                readOnly
-                value={showApiKey ? project.apiKey : `cpk_live_••••••••••••${project.apiKey.slice(-4)}`}
-                className="w-full max-w-lg rounded-lg border border-cp-border bg-cp-secondary px-3 py-2 font-mono text-xs text-cp-text"
-              />
-              <button
-                type="button"
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="rounded-lg border border-cp-border bg-cp-elevated p-2 text-cp-text-secondary hover:text-cp-text hover:bg-cp-border transition-colors"
-                title={showApiKey ? 'Hide key' : 'Show key'}
-              >
-                {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-              <button
-                onClick={handleCopyKey}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-cp-border bg-cp-elevated px-3 py-2 text-xs font-medium text-cp-text hover:bg-cp-border transition-colors"
-              >
-                {copiedKey ? <Check className="h-4 w-4 text-cp-healthy" /> : <Copy className="h-4 w-4" />}
-                {copiedKey ? 'Copied' : 'Copy Key'}
-              </button>
+          <div className="rounded-xl border border-cp-border bg-cp-card p-5 space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-cp-text mb-1 flex items-center gap-2">
+                <Key className="h-4 w-4 text-cp-crimson" />
+                Project API Key
+              </h3>
+              <p className="text-xs text-cp-text-secondary">
+                Pass this key to your CrimsonPulse Python SDK configuration. Stored as an irreversible SHA-256 cryptographic hash in PostgreSQL.
+              </p>
             </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="flex items-center gap-2 w-full max-w-lg">
+                <input
+                  type="text"
+                  readOnly
+                  value={project.apiKey}
+                  className="w-full rounded-lg border border-cp-border bg-cp-secondary px-3 py-2 font-mono text-xs text-cp-text"
+                />
+                <span
+                  className="inline-flex items-center gap-1 rounded bg-cp-elevated px-2 py-1 text-[11px] text-cp-text-secondary whitespace-nowrap"
+                  title="Stored securely as SHA-256 hash. Plaintext secret is never readable after generation."
+                >
+                  <Lock className="h-3 w-3 text-cp-text-secondary" /> Hashed
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyKey}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-cp-border bg-cp-elevated px-3 py-2 text-xs font-medium text-cp-text hover:bg-cp-border transition-colors"
+                  title="Copy masked key identifier"
+                >
+                  {copiedKey ? <Check className="h-4 w-4 text-cp-healthy" /> : <Copy className="h-4 w-4" />}
+                  {copiedKey ? 'Copied' : 'Copy'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRotateProjectKey}
+                  disabled={rotatingKey}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-cp-crimson px-3 py-2 text-xs font-semibold text-white hover:bg-cp-red transition-colors disabled:opacity-50"
+                  title="Revokes the existing key and generates a fresh one-time secret token"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${rotatingKey ? 'animate-spin' : ''}`} />
+                  {rotatingKey ? 'Rotating...' : 'Rotate Key'}
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-cp-text-secondary">
+              Need a new secret token? Click <strong>Rotate Key</strong> to immediately revoke the current key and generate a fresh one-time secret.
+            </p>
           </div>
 
           <div className="rounded-xl border border-cp-border bg-cp-card p-5 space-y-3">
@@ -579,18 +658,18 @@ export function ProjectDetailsPage() {
               <pre>{`# settings.py
 import os
 
-CRIMSONPULSE = {
+CRIMSONPULSE_CONFIG = {
     "ENABLED": True,
     # Best practice: inject via environment variable (or replace with YOUR_PROJECT_KEY)
-    "PROJECT_KEY": os.environ.get("CRIMSONPULSE_PROJECT_KEY", "YOUR_PROJECT_KEY"),
+    "API_KEY": os.environ.get("CRIMSONPULSE_PROJECT_KEY", "YOUR_PROJECT_KEY"),
+    "API_URL": os.environ.get("CRIMSONPULSE_API_URL", "http://127.0.0.1:8000/api/v1/ingest/events/"),
     "ENVIRONMENT": os.environ.get("CRIMSONPULSE_ENV", "${project.environment}"),
-    "SERVICE_NAME": "${project.slug}",
-    "SAMPLE_RATE": 1.0,
     "CAPTURE_HEADERS": False,  # Credential redaction active: Auth tokens & cookies never sent
 }
 
+# Add CrimsonPulseMiddleware to the top of MIDDLEWARE for high-precision latency
 MIDDLEWARE = [
-    "crimsonpulse.middleware.PulseMonitoringMiddleware",
+    "crimsonpulse.middleware.CrimsonPulseMiddleware",
     # ... existing middleware
 ]`}</pre>
             </div>
@@ -706,6 +785,66 @@ MIDDLEWARE = [
           />
         </div>
       )}
+
+      {/* Rotated Key Modal */}
+      <Modal
+        open={showRotatedSecretModal}
+        onClose={() => setShowRotatedSecretModal(false)}
+        title="Project API Key Rotated"
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-300 space-y-1">
+            <div className="flex items-center gap-2 font-semibold text-amber-400">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>One-Time Secret Display Warning</span>
+            </div>
+            <p className="text-amber-300/80 leading-relaxed">
+              This secret API key is only displayed once. CrimsonPulse AI stores irreversible SHA-256 hashes and cannot display this value again. Save it into your environment now.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-cp-text-secondary">Raw Secret Key</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={rotatedKeySecret || ''}
+                className="w-full rounded-lg border border-cp-border bg-cp-secondary px-3 py-2 font-mono text-xs text-cp-text select-all"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (rotatedKeySecret) {
+                    navigator.clipboard.writeText(rotatedKeySecret)
+                    setCopiedRotatedKey(true)
+                    setTimeout(() => setCopiedRotatedKey(false), 2000)
+                    addToast({
+                      id: Math.random().toString(),
+                      type: 'success',
+                      title: 'Copied',
+                      message: 'New secret key copied to clipboard',
+                    })
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-cp-crimson px-3 py-2 text-xs font-semibold text-white hover:bg-cp-red transition-colors shrink-0"
+              >
+                {copiedRotatedKey ? <Check className="h-4 w-4 text-white" /> : <Copy className="h-4 w-4" />}
+                {copiedRotatedKey ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => setShowRotatedSecretModal(false)}
+              className="rounded-lg bg-cp-elevated border border-cp-border px-4 py-2 text-xs font-medium text-cp-text hover:bg-cp-border transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

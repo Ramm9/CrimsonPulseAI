@@ -17,9 +17,11 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { MethodBadge } from '@/components/shared/MethodBadge'
 import { SearchInput } from '@/components/shared/SearchInput'
 import { formatRelativeTime } from '@/utils/helpers'
+import { useAppStore } from '@/store/appStore'
 
 export function IncidentsPage() {
   const navigate = useNavigate()
+  const currentProject = useAppStore((s) => s.currentProject)
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -32,7 +34,7 @@ export function IncidentsPage() {
     async function loadIncidents() {
       setLoading(true)
       try {
-        const data = await incidentService.getIncidents()
+        const data = await incidentService.getIncidents({ projectId: currentProject || undefined })
         setIncidents(data)
       } catch (err) {
         console.error('Failed to load incidents:', err)
@@ -41,7 +43,7 @@ export function IncidentsPage() {
       }
     }
     loadIncidents()
-  }, [])
+  }, [currentProject])
 
   const filteredIncidents = useMemo(() => {
     return incidents.filter((inc) => {

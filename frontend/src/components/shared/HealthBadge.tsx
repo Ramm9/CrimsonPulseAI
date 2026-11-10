@@ -24,9 +24,9 @@ const statusConfig: Record<HealthStatus, { dot: string; text: string; label: str
     label: 'Critical',
   },
   unknown: {
-    dot: 'bg-gray-500',
-    text: 'text-gray-400',
-    label: 'Unknown',
+    dot: 'bg-zinc-500',
+    text: 'text-zinc-400',
+    label: 'Insufficient Data',
   },
 }
 

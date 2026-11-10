@@ -1,13 +1,18 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, Navigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { MobileNavigation } from './MobileNavigation'
 import { ToastContainer } from '@/components/shared/Toast'
 import { CommandPalette } from '@/components/shared/CommandPalette'
+import { authService } from '@/services/authService'
 
 export function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  if (!authService.isAuthenticated()) {
+    return <Navigate to="/login" replace />
+  }
 
   return (
     <div className="flex h-screen bg-cp-bg text-cp-text">

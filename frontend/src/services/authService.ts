@@ -1,9 +1,11 @@
-import { simulateDelay, simulateMutationDelay } from '@/services/api'
+import { apiClient, isDemoModeActive, simulateDelay, simulateMutationDelay, notifyDemoMutation } from '@/services/api'
 import { currentUser } from '@/mock/data'
 import type { User } from '@/types'
 
 const AUTH_TOKEN_KEY = 'cp_auth_token'
-const MOCK_TOKEN = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.mock-crimsonpulse-token'
+const REFRESH_TOKEN_KEY = 'cp_refresh_token'
+const USER_KEY = 'cp_user'
+const AUTH_FLAG_KEY = 'cp_auth'
 
 interface LoginCredentials {
   email: string
@@ -20,82 +22,169 @@ interface RegisterData {
 interface AuthResponse {
   user: User
   token: string
+  tokens?: {
+    access: string
+    refresh: string
+  }
 }
 
 /**
- * Simulate user login.
- * Accepts any email/password combo in mock mode.
+ * User login.
+ * Authenticates against Neon PostgreSQL via Django REST Framework.
+ * Never creates dummy user or mock token in live mode.
  */
 export async function login(credentials: LoginCredentials): Promise<AuthResponse> {
-  await simulateDelay()
+  try {
+    const res = await apiClient.post<AuthResponse>('/auth/login/', {
+      email: credentials.email,
+      password: credentials.password,
+    })
 
-  // In mock mode, accept the demo credentials
-  if (credentials.email === 'alex.rivera@crimsonpulse.io' || credentials.email === 'demo@crimsonpulse.io') {
-    const token = MOCK_TOKEN
-    localStorage.setItem(AUTH_TOKEN_KEY, token)
-    return { user: currentUser, token }
-  }
-
-  // Accept any valid-looking email for demo purposes
-  if (credentials.email && credentials.password) {
-    const token = MOCK_TOKEN
-    localStorage.setItem(AUTH_TOKEN_KEY, token)
-    return {
-      user: {
-        ...currentUser,
-        email: credentials.email,
-        name: credentials.email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-      },
-      token,
+    if (res.data && res.data.token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, res.data.token)
+      if (res.data.tokens?.refresh) {
+        localStorage.setItem(REFRESH_TOKEN_KEY, res.data.tokens.refresh)
+      }
+      if (res.data.user) {
+        localStorage.setItem(USER_KEY, JSON.stringify(res.data.user))
+      }
+      localStorage.setItem(AUTH_FLAG_KEY, 'true')
+      return res.data
     }
+  } catch (err: any) {
+    const message =
+      err.response?.data?.message ||
+      err.response?.data?.detail ||
+      (typeof err.response?.data === 'string' ? err.response.data : null) ||
+      'Invalid email or password.'
+    throw new Error(message)
   }
 
-  throw new Error('Invalid email or password')
+  // Only reached in explicit demo mode
+  if (isDemoModeActive()) {
+    await simulateDelay()
+    notifyDemoMutation('Session Login', 'Authenticated via local demo session.')
+    const demoToken = 'demo-token-active'
+    localStorage.setItem(AUTH_TOKEN_KEY, demoToken)
+    localStorage.setItem(USER_KEY, JSON.stringify(currentUser))
+    localStorage.setItem(AUTH_FLAG_KEY, 'true')
+    return { user: currentUser, token: demoToken }
+  }
+
+  throw new Error('Authentication failed: No token returned from server.')
 }
 
 /**
- * Simulate user registration.
+ * User registration.
+ * Registers against real Django backend and creates organization in PostgreSQL.
  */
 export async function register(data: RegisterData): Promise<AuthResponse> {
-  await simulateMutationDelay()
+  try {
+    const res = await apiClient.post<AuthResponse>('/auth/register/', {
+      name: data.name,
+      email: data.email,
+      password: data.password,
+      organization_name: data.organizationName || `${data.name}'s Workspace`,
+    })
 
-  if (!data.email || !data.password || !data.name) {
-    throw new Error('All fields are required')
+    if (res.data && res.data.token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, res.data.token)
+      if (res.data.tokens?.refresh) {
+        localStorage.setItem(REFRESH_TOKEN_KEY, res.data.tokens.refresh)
+      }
+      if (res.data.user) {
+        localStorage.setItem(USER_KEY, JSON.stringify(res.data.user))
+      }
+      localStorage.setItem(AUTH_FLAG_KEY, 'true')
+      return res.data
+    }
+  } catch (err: any) {
+    const message =
+      err.response?.data?.message ||
+      err.response?.data?.detail ||
+      (typeof err.response?.data === 'string' ? err.response.data : null) ||
+      'Registration failed.'
+    throw new Error(message)
   }
 
-  const newUser: User = {
-    id: `usr_${Date.now()}`,
-    name: data.name,
-    email: data.email,
-    role: 'owner',
-    createdAt: new Date().toISOString(),
+  if (isDemoModeActive()) {
+    await simulateMutationDelay()
+    notifyDemoMutation('User Registration', 'Created demo profile locally.')
+    const newUser: User = {
+      id: `usr_${Date.now()}`,
+      name: data.name,
+      email: data.email,
+      role: 'owner',
+      createdAt: new Date().toISOString(),
+    }
+    const demoToken = 'demo-token-active'
+    localStorage.setItem(AUTH_TOKEN_KEY, demoToken)
+    localStorage.setItem(USER_KEY, JSON.stringify(newUser))
+    localStorage.setItem(AUTH_FLAG_KEY, 'true')
+    return { user: newUser, token: demoToken }
   }
 
-  const token = MOCK_TOKEN
-  localStorage.setItem(AUTH_TOKEN_KEY, token)
-
-  return { user: newUser, token }
+  throw new Error('Registration failed: No token returned from server.')
 }
 
 /**
  * Log out the current user.
+ * Blacklists refresh token on Django backend and purges local credentials.
  */
 export async function logout(): Promise<void> {
-  await simulateMutationDelay()
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
+  if (refreshToken) {
+    try {
+      await apiClient.post('/auth/logout/', { refresh: refreshToken })
+    } catch {
+      // Backend logout is best-effort
+    }
+  }
+
   localStorage.removeItem(AUTH_TOKEN_KEY)
+  localStorage.removeItem(REFRESH_TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+  localStorage.removeItem(AUTH_FLAG_KEY)
 }
 
 /**
  * Get the currently authenticated user.
- * Returns null if no valid session exists.
+ * Validates session against GET /auth/me/ on Django backend.
  */
 export async function getCurrentUser(): Promise<User | null> {
-  await simulateDelay(200, 500)
-
   const token = localStorage.getItem(AUTH_TOKEN_KEY)
   if (!token) return null
 
-  return currentUser
+  try {
+    const res = await apiClient.get<User>('/auth/me/')
+    if (res.data && res.data.id) {
+      localStorage.setItem(USER_KEY, JSON.stringify(res.data))
+      return res.data
+    }
+  } catch {
+    if (!isDemoModeActive()) {
+      // Token is invalid or expired
+      localStorage.removeItem(AUTH_TOKEN_KEY)
+      localStorage.removeItem(REFRESH_TOKEN_KEY)
+      localStorage.removeItem(USER_KEY)
+      localStorage.removeItem(AUTH_FLAG_KEY)
+      return null
+    }
+  }
+
+  if (isDemoModeActive()) {
+    const cached = localStorage.getItem(USER_KEY)
+    if (cached) {
+      try {
+        return JSON.parse(cached)
+      } catch {
+        // fallback
+      }
+    }
+    return currentUser
+  }
+
+  return null
 }
 
 /**
@@ -104,3 +193,13 @@ export async function getCurrentUser(): Promise<User | null> {
 export function isAuthenticated(): boolean {
   return !!localStorage.getItem(AUTH_TOKEN_KEY)
 }
+
+export const authService = {
+  login,
+  register,
+  logout,
+  getCurrentUser,
+  isAuthenticated,
+}
+
+export default authService

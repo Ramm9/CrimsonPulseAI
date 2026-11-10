@@ -15,12 +15,14 @@ import { MethodBadge } from '@/components/shared/MethodBadge'
 import { HealthBadge } from '@/components/shared/HealthBadge'
 import { SearchInput } from '@/components/shared/SearchInput'
 import { formatNumber, formatLatency, formatPercentage, formatRelativeTime } from '@/utils/helpers'
+import { useAppStore } from '@/store/appStore'
 
 type SortField = 'requestCount' | 'p95Latency' | 'avgLatency' | 'errorRate' | 'path'
 type SortOrder = 'asc' | 'desc'
 
 export function APIExplorerPage() {
   const navigate = useNavigate()
+  const currentProject = useAppStore((s) => s.currentProject)
   const [endpoints, setEndpoints] = useState<Endpoint[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -35,7 +37,7 @@ export function APIExplorerPage() {
     async function loadEndpoints() {
       setLoading(true)
       try {
-        const data = await endpointService.getEndpoints()
+        const data = await endpointService.getEndpoints(currentProject || undefined)
         setEndpoints(data)
       } catch (err) {
         console.error('Failed to load endpoints:', err)
@@ -44,7 +46,7 @@ export function APIExplorerPage() {
       }
     }
     loadEndpoints()
-  }, [])
+  }, [currentProject])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {

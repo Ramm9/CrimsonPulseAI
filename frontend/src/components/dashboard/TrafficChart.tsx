@@ -11,13 +11,15 @@ import {
   ResponsiveContainer,
   Scatter,
 } from 'recharts'
-import type { MetricWindow } from '@/types'
+import type { MetricWindow, Anomaly } from '@/types'
 import { cn } from '@/utils/cn'
 import { formatNumber, formatLatency, formatPercentage } from '@/utils/helpers'
 import { format } from 'date-fns'
 
 interface TrafficChartProps {
   data: MetricWindow[]
+  anomalies?: Anomaly[]
+  timeRange?: string
   className?: string
 }
 
@@ -28,6 +30,8 @@ interface ChartDataPoint {
   p95Latency: number
   errorRate: number
   anomaly?: number | null
+  anomalyDescription?: string
+  index: number
 }
 
 interface CustomTooltipPayloadItem {
@@ -35,6 +39,7 @@ interface CustomTooltipPayloadItem {
   value: number
   color: string
   name: string
+  payload?: ChartDataPoint
 }
 
 interface CustomTooltipProps {
@@ -45,6 +50,8 @@ interface CustomTooltipProps {
 
 function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload || payload.length === 0) return null
+
+  const pointPayload = payload[0]?.payload
 
   return (
     <div className="rounded-lg border border-cp-border bg-cp-elevated px-4 py-3 shadow-xl">
@@ -77,6 +84,12 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
             </div>
           )
         })}
+        {pointPayload?.anomaly && (
+          <div className="mt-2 border-t border-cp-border/60 pt-1.5 flex items-center gap-1.5 text-xs text-cp-critical font-medium">
+            <span className="h-1.5 w-1.5 rounded-full bg-cp-critical animate-ping" />
+            <span>Anomaly: {pointPayload.anomalyDescription || 'Observed deviation from baseline'}</span>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -92,7 +105,8 @@ function AnomalyDot({ cx, cy, payload }: DiamondDotProps) {
   if (!payload?.anomaly || cx === undefined || cy === undefined) return null
 
   return (
-    <g>
+    <g className="cursor-pointer">
+      <title>{payload.anomalyDescription || "Anomaly Marker"}</title>
       <polygon
         points={`${cx},${cy - 8} ${cx + 6},${cy} ${cx},${cy + 8} ${cx - 6},${cy}`}
         fill="#E63946"
@@ -109,25 +123,52 @@ function AnomalyDot({ cx, cy, payload }: DiamondDotProps) {
   )
 }
 
-export function TrafficChart({ data, className }: TrafficChartProps) {
+export function TrafficChart({ data, anomalies = [], timeRange = '24h', className }: TrafficChartProps) {
   const chartData: ChartDataPoint[] = useMemo(() => {
+    const isMultiDay = timeRange === '7d' || timeRange === '30d'
+
     return data.map((d, index) => {
       const date = new Date(d.timestamp)
-      const isAnomaly = d.p95Latency > 500 || d.errorRate > 3
+      const hourFormat = isMultiDay ? 'MMM dd HH:mm' : 'HH:mm'
+
+      // Match against genuine anomalies
+      const bucketTime = date.getTime()
+      const stepMs = data.length > 1
+        ? (new Date(data[1].timestamp).getTime() - new Date(data[0].timestamp).getTime())
+        : 3600000
+
+      const matchedAnomaly = anomalies.find((a) => {
+        const aTime = new Date(a.detectedAt).getTime()
+        return aTime >= bucketTime && aTime < bucketTime + stepMs
+      })
+
+      const isAnomaly = matchedAnomaly !== undefined || (d.errorRate > 10 && d.requests > 3)
+
       return {
         timestamp: d.timestamp,
-        hour: format(date, 'HH:mm'),
+        hour: format(date, hourFormat),
         requests: d.requests,
         p95Latency: d.p95Latency,
         errorRate: d.errorRate,
         anomaly: isAnomaly ? d.p95Latency : null,
+        anomalyDescription: matchedAnomaly ? matchedAnomaly.description : undefined,
         index,
       }
     })
-  }, [data])
+  }, [data, anomalies, timeRange])
+
+  const hasTraffic = data.some((d) => d.requests > 0)
 
   return (
-    <div className={cn('h-[340px] w-full', className)}>
+    <div className={cn('relative h-[340px] w-full', className)}>
+      {!hasTraffic && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-cp-card/60 backdrop-blur-[1px]">
+          <p className="text-sm font-medium text-cp-text">No traffic recorded</p>
+          <p className="mt-1 text-xs text-cp-text-secondary">
+            No API events captured for the selected project and environment in this window.
+          </p>
+        </div>
+      )}
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={chartData}

@@ -12,6 +12,8 @@ const methodStyles: Record<HttpMethod, string> = {
   PUT: 'bg-amber-500/10 text-amber-400',
   PATCH: 'bg-purple-500/10 text-purple-400',
   DELETE: 'bg-red-500/10 text-red-400/80',
+  OPTIONS: 'bg-zinc-500/10 text-zinc-400',
+  HEAD: 'bg-teal-500/10 text-teal-400',
 }
 
 export function MethodBadge({ method, className }: MethodBadgeProps) {

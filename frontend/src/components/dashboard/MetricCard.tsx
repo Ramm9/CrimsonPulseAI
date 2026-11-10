@@ -1,4 +1,4 @@
-import { type LucideIcon, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { type LucideIcon, TrendingUp, TrendingDown, Minus, Info } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
 interface MetricCardProps {
@@ -8,6 +8,7 @@ interface MetricCardProps {
   changeLabel: string
   icon: LucideIcon
   trend: 'up' | 'down' | 'neutral'
+  tooltip?: string
   sparklineData?: number[]
   className?: string
 }
@@ -61,6 +62,7 @@ export function MetricCard({
   changeLabel,
   icon: Icon,
   trend,
+  tooltip,
   sparklineData,
   className,
 }: MetricCardProps) {
@@ -88,10 +90,20 @@ export function MetricCard({
             <Icon className="h-4.5 w-4.5 text-cp-crimson" size={18} />
           </div>
 
-          {/* Title */}
-          <p className="text-xs font-medium uppercase tracking-wider text-cp-text-secondary">
-            {title}
-          </p>
+          {/* Title with Tooltip */}
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-medium uppercase tracking-wider text-cp-text-secondary">
+              {title}
+            </p>
+            {tooltip && (
+              <div className="group/tooltip relative inline-flex items-center">
+                <Info size={12} className="cursor-help text-cp-text-secondary/60 hover:text-cp-text-secondary" />
+                <div className="pointer-events-none absolute left-1/2 bottom-full z-50 mb-2 -translate-x-1/2 w-52 rounded-lg border border-cp-border bg-cp-elevated p-2 text-[11px] font-normal normal-case tracking-normal text-cp-text shadow-xl opacity-0 transition-opacity group-hover/tooltip:opacity-100">
+                  {tooltip}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Value */}
           <p className="mt-1 text-2xl font-semibold text-cp-text">{value}</p>
@@ -110,7 +122,7 @@ export function MetricCard({
                 isGoodChange ? 'text-cp-healthy' : 'text-cp-critical'
               )}
             >
-              {isPositiveChange ? '+' : ''}
+              {change !== 0 ? (isPositiveChange ? `+${change}% ` : `${change}% `) : ''}
               {changeLabel}
             </span>
           </div>

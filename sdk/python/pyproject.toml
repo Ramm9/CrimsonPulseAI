@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crimsonpulse"
+version = "1.0.0"
+description = "Official Python SDK and Django Telemetry Middleware for CrimsonPulse AI"
+readme = "README.md"
+authors = [
+    { name = "CrimsonPulse AI Team", email = "engineering@crimsonpulse.ai" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+django = ["django>=3.2"]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-django>=4.5.0",
+]

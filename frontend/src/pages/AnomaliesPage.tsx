@@ -19,6 +19,7 @@ import { SeverityBadge } from '@/components/shared/SeverityBadge'
 import { formatRelativeTime } from '@/utils/helpers'
 import { anomalyService } from '@/services/anomalyService'
 import type { Anomaly, AnomalySeverity } from '@/types'
+import { useAppStore } from '@/store/appStore'
 
 type AnomalyStatus = Anomaly['status']
 
@@ -54,6 +55,7 @@ function formatMetricValue(metric: string, value: number): string {
 
 export default function AnomaliesPage() {
   const navigate = useNavigate()
+  const currentProject = useAppStore((s) => s.currentProject)
   const [anomalies, setAnomalies] = useState<Anomaly[]>([])
   const [loading, setLoading] = useState(true)
   const [severityFilter, setSeverityFilter] = useState<AnomalySeverity | 'all'>('all')
@@ -64,7 +66,7 @@ export default function AnomaliesPage() {
     async function loadData() {
       setLoading(true)
       try {
-        const data = await anomalyService.getAnomalies()
+        const data = await anomalyService.getAnomalies({ projectId: currentProject || undefined })
         setAnomalies(data)
       } catch (err) {
         console.error('Failed to load anomalies:', err)
@@ -73,7 +75,7 @@ export default function AnomaliesPage() {
       }
     }
     loadData()
-  }, [])
+  }, [currentProject])
 
   const uniqueEndpoints = useMemo(
     () => Array.from(new Set(anomalies.map((a) => a.endpoint))),

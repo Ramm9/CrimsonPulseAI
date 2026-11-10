@@ -20,7 +20,7 @@ import { formatRelativeTime } from '@/utils/helpers'
 import { useAppStore } from '@/store/appStore'
 
 export function ContractsPage() {
-  const { addToast } = useAppStore()
+  const { addToast, currentProject } = useAppStore()
   const [specs, setSpecs] = useState<ContractSpec[]>([])
   const [violations, setViolations] = useState<ContractViolation[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,7 +37,7 @@ export function ContractsPage() {
       setLoading(true)
       try {
         const [specList, violationList] = await Promise.all([
-          contractService.getSpecs(),
+          contractService.getSpecs(currentProject || undefined),
           contractService.getViolations(),
         ])
         setSpecs(specList)
@@ -49,7 +49,7 @@ export function ContractsPage() {
       }
     }
     loadData()
-  }, [])
+  }, [currentProject])
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault()

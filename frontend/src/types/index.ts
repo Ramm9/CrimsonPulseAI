@@ -1,4 +1,4 @@
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD'
 
 export type EnvironmentType = 'development' | 'staging' | 'production'
 
@@ -55,6 +55,7 @@ export interface Endpoint {
   p99Latency: number
   errorRate: number
   health: HealthStatus
+  healthReason?: string
   lastActivity: string
   statusDistribution: StatusDistribution
 }

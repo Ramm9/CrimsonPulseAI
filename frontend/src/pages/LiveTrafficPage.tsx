@@ -12,12 +12,15 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { telemetryService } from '@/services/telemetryService'
+import { isDemoModeActive } from '@/services/api'
 import type { TelemetryEvent, HttpMethod, EnvironmentType } from '@/types'
 import { MethodBadge } from '@/components/shared/MethodBadge'
 import { SearchInput } from '@/components/shared/SearchInput'
 import { formatNumber } from '@/utils/helpers'
+import { useAppStore } from '@/store/appStore'
 
 export function LiveTrafficPage() {
+  const currentProject = useAppStore((s) => s.currentProject)
   const [events, setEvents] = useState<TelemetryEvent[]>([])
   const [isLive, setIsLive] = useState(true)
   const [search, setSearch] = useState('')
@@ -30,28 +33,35 @@ export function LiveTrafficPage() {
   // Initialize with initial telemetry events
   useEffect(() => {
     async function loadInitial() {
-      const initial = await telemetryService.getLiveTraffic()
+      const initial = await telemetryService.getLiveTraffic(50, currentProject || undefined)
       setEvents(initial)
     }
     loadInitial()
-  }, [])
+  }, [currentProject])
 
-  // Auto-stream events every 1.5 - 2.5 seconds when isLive
+  // Auto-stream events when isLive: in demo mode, synthesizes events; in live mode, polls real telemetry
   useEffect(() => {
     if (!isLive) {
       if (intervalRef.current) clearInterval(intervalRef.current)
       return
     }
 
-    intervalRef.current = window.setInterval(async () => {
-      const newEvent = await telemetryService.generateLiveEvent()
-      setEvents((prev) => [newEvent, ...prev.slice(0, 99)]) // Keep last 100 events
-    }, 1800)
+    if (isDemoModeActive()) {
+      intervalRef.current = window.setInterval(async () => {
+        const newEvent = await telemetryService.generateLiveEvent(currentProject || undefined)
+        setEvents((prev) => [newEvent, ...prev.slice(0, 99)])
+      }, 1800)
+    } else {
+      intervalRef.current = window.setInterval(async () => {
+        const liveFeed = await telemetryService.getLiveTraffic(50, currentProject || undefined)
+        setEvents(liveFeed)
+      }, 3000)
+    }
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [isLive])
+  }, [isLive, currentProject])
 
   const clearEvents = () => {
     setEvents([])
